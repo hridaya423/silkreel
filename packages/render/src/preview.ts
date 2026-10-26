@@ -41,9 +41,7 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
           target.clearRect(0, 0, tl.width, tl.height)
           target.drawImage(gl.render(tl, frame), 0, 0)
           drawAnnotations(target, gl.annotations(), tl.width, tl.height)
-          const p = frame / tl.totalFrames
-          const [f0, f1] = tl.scene.beats.fade
-          drawTitle(target, tl, p, 1 - Math.min(1, Math.max(0, (p - f0) / (f1 - f0))))
+          drawTitle(target, tl, frame / tl.totalFrames, 1)
           return
         }
       }

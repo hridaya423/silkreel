@@ -2,19 +2,12 @@ import path from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { ASPECT_SIZE } from '@silk-reel/choreo'
-import type { FilmConfig, Timeline } from '@silk-reel/choreo'
-import type { GateReport } from '@silk-reel/metrics'
+import type { FilmConfig } from '@silk-reel/choreo'
 import { FORMAT_EXT, RENDER_ENTRY, isAlphaFormat, renderFilm } from './render-film.js'
 import type { OutputFormat } from './render-film.js'
 import { compileFilm, loadDemoBoard, boardFromJson, defaultFilmConfig } from './boards.js'
 import type { DemoBoardId } from './boards.js'
-import { runGate } from '@silk-reel/metrics'
 const exportsRoot = path.resolve(import.meta.dirname, '../../../exports')
-
-export type GateAdvisory =
-  | { status: 'passed'; report: GateReport }
-  | { status: 'failed'; report: GateReport }
-  | { status: 'unavailable'; error: string }
 
 interface JobBase {
   id: string
@@ -24,18 +17,13 @@ interface JobBase {
 }
 
 type PendingJob = JobBase & { status: 'pending' }
-type RenderingJob = JobBase & { status: 'rendering'; startedAt: string }
-type DoneJobBase = JobBase & {
+type RenderingJob = JobBase & { status: 'rendering'; startedAt: string; etaSeconds: number | null }
+type DoneJob = JobBase & {
   status: 'done'
   startedAt: string
   finishedAt: string
   downloadPath: string
 }
-type DoneJob = DoneJobBase &
-  (
-    | { gate: Extract<GateAdvisory, { status: 'passed' | 'failed' }>; metricsReport: GateReport; metricsError?: never }
-    | { gate: Extract<GateAdvisory, { status: 'unavailable' }>; metricsError: string; metricsReport?: never }
-  )
 type ErrorJob = JobBase & {
   status: 'error'
   startedAt: string
@@ -67,7 +55,6 @@ export type BundleRenderer = (entryPoint: string) => Promise<string>
 
 export interface RenderQueueOptions {
   renderFilm?: typeof renderFilm
-  runGate?: typeof runGate
   bundle?: BundleRenderer
   exportsRoot?: string
 }
@@ -93,7 +80,6 @@ function enqueueMachine(task: () => Promise<void>): Promise<void> {
 export class RenderQueue implements RenderQueuePort {
   private readonly jobs = new Map<string, RenderJob>()
   private readonly renderFilm: typeof renderFilm
-  private readonly runGate: typeof runGate
   private readonly bundle: BundleRenderer
   private readonly exportsRoot: string
   private idlePromise: Promise<void> = Promise.resolve()
@@ -102,7 +88,6 @@ export class RenderQueue implements RenderQueuePort {
 
   constructor(options: RenderQueueOptions = {}) {
     this.renderFilm = options.renderFilm ?? renderFilm
-    this.runGate = options.runGate ?? runGate
     this.bundle = options.bundle ?? bundleEntryPoint
     this.exportsRoot = options.exportsRoot ?? exportsRoot
   }
@@ -184,16 +169,17 @@ export class RenderQueue implements RenderQueuePort {
     const job: RenderingJob = {
       ...entry.job,
       status: 'rendering',
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      etaSeconds: null
     }
     this.jobs.set(job.id, job)
     return job
   }
 
-  private updateProgress(id: string, progress: number): void {
+  private updateProgress(id: string, progress: number, etaSeconds: number | null): void {
     const job = this.jobs.get(id)
     if (job?.status !== 'rendering') return
-    this.jobs.set(id, { ...job, progress })
+    this.jobs.set(id, { ...job, progress, etaSeconds })
   }
 
   private isCancelled(id: string): boolean {
@@ -202,21 +188,6 @@ export class RenderQueue implements RenderQueuePort {
 
   private async discardOutput(outputLocation: string): Promise<void> {
     await rm(outputLocation, { force: true }).catch(() => undefined)
-  }
-
-  private async readGateAdvisory(outputLocation: string, config: FilmConfig, timeline: Timeline): Promise<GateAdvisory> {
-    try {
-      const report = await this.runGate(outputLocation, {
-        width: config.output.width,
-        height: config.output.height,
-        fps: config.output.fps,
-        totalFrames: timeline.totalFrames,
-        style: timeline.style
-      })
-      return report.passed ? { status: 'passed', report } : { status: 'failed', report }
-    } catch (err) {
-      return { status: 'unavailable', error: errorMessage(err) }
-    }
   }
 
   private async run(entry: QueueEntry): Promise<void> {
@@ -241,48 +212,25 @@ export class RenderQueue implements RenderQueuePort {
         inputProps,
         outputLocation,
         format,
-        onProgress: (pct) => {
+        onProgress: ({ pct, etaSeconds }) => {
           const nextProgress = nextJobProgress(progress, pct)
           if (nextProgress === undefined) return
           progress = nextProgress
-          this.updateProgress(rendering.id, nextProgress)
+          this.updateProgress(rendering.id, nextProgress, etaSeconds)
         }
       })
       if (this.isCancelled(rendering.id)) {
         await this.discardOutput(outputLocation)
         return
       }
-      const gate: GateAdvisory =
-        format === 'mp4'
-          ? await this.readGateAdvisory(outputLocation, entry.config, inputProps.timeline)
-          : { status: 'unavailable', error: 'gate runs on mp4 only' }
-      if (this.isCancelled(rendering.id)) {
-        await this.discardOutput(outputLocation)
-        return
+      const done: DoneJob = {
+        ...rendering,
+        status: 'done',
+        progress: 100,
+        finishedAt: new Date().toISOString(),
+        downloadPath: outputLocation
       }
-      if (gate.status === 'unavailable') {
-        const done: DoneJob = {
-          ...rendering,
-          status: 'done',
-          progress: 100,
-          finishedAt: new Date().toISOString(),
-          downloadPath: outputLocation,
-          gate,
-          metricsError: gate.error
-        }
-        this.jobs.set(done.id, done)
-      } else {
-        const done: DoneJob = {
-          ...rendering,
-          status: 'done',
-          progress: 100,
-          finishedAt: new Date().toISOString(),
-          downloadPath: outputLocation,
-          gate,
-          metricsReport: gate.report
-        }
-        this.jobs.set(done.id, done)
-      }
+      this.jobs.set(done.id, done)
     } catch (err) {
       if (this.isCancelled(rendering.id)) {
         if (outputLocation !== undefined) await this.discardOutput(outputLocation)
@@ -331,5 +279,7 @@ function mergeConfig(partial: Partial<FilmConfig> | undefined, demoId?: string):
   if (partial.title !== undefined) config.title = partial.title
   if (partial.transparent !== undefined) config.transparent = partial.transparent
   if (partial.cast !== undefined) config.cast = partial.cast
+  if (partial.hero !== undefined) config.hero = partial.hero
+  if (partial.mask !== undefined) config.mask = partial.mask
   return config
 }

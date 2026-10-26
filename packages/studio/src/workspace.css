@@ -262,56 +262,14 @@
   width: 100%;
   height: 54px;
   display: block;
-  position: relative;
-  opacity: 0.54;
+  color: var(--accent);
+  opacity: 0.7;
 }
 
-.demo-plot::before,
-.demo-plot::after,
-.demo-plot i {
-  content: '';
-  position: absolute;
-  border: 1px solid var(--accent);
-}
-
-.demo-plot::before {
-  width: 62px;
-  height: 28px;
-  left: 12%;
-  top: 11px;
-}
-
-.demo-plot::after {
-  width: 8px;
-  height: 8px;
-  left: 53%;
-  top: 21px;
-  transform: rotate(45deg);
-}
-
-.demo-plot i {
-  width: 5px;
-  height: 5px;
-  top: 23px;
-  border-radius: 50%;
-}
-
-.demo-plot i:nth-child(1) { left: 22%; }
-.demo-plot i:nth-child(2) { left: 31%; }
-.demo-plot i:nth-child(3) { left: 70%; }
-.demo-plot i:nth-child(4) { left: 79%; }
-
-.demo-card-2 .demo-plot::before {
-  width: 105px;
-  left: 17%;
-  transform: skewX(-16deg);
-}
-
-.demo-card-3 .demo-plot::before {
-  width: 72%;
-  height: 38px;
-  left: 4%;
-  top: 6px;
+.demo-plot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .demo-card:hover .demo-cta {
@@ -381,29 +339,8 @@
 .export-error {
   color: var(--err);
   font-size: 11px;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gate-chip {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border-radius: 3px;
-  padding: 3px 8px;
-  border: 1px solid;
-}
-
-.gate-ok {
-  color: var(--ok);
-  border-color: var(--ok);
-}
-
-.gate-warn {
-  color: var(--warn);
-  border-color: var(--warn);
+  max-width: 420px;
+  overflow-wrap: anywhere;
 }
 
 .button-link {
@@ -892,19 +829,35 @@ button.primary:hover:not(:disabled) {
 
 .swatch-row {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .swatch {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 10px;
+}
+
+.swatch-chip {
   width: 36px;
   height: 22px;
-  padding: 0;
   border: 1px solid var(--line);
   border-radius: 4px;
 }
 
 .swatch-on {
+  color: var(--ink);
+}
+
+.swatch-on .swatch-chip {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -922,6 +875,26 @@ button.primary:hover:not(:disabled) {
   border: 1px solid var(--line);
   border-radius: 4px;
   background: transparent;
+}
+
+.pick-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.pick-fields .field {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-secondary);
+}
+
+.api-down {
+  margin: 0 16px;
+}
+
+.api-down code {
+  user-select: all;
 }
 
 .title-fields {

@@ -31,9 +31,7 @@ function completedJob(id: string, downloadPath: string, format: OutputFormat = '
     createdAt: now,
     startedAt: now,
     finishedAt: now,
-    downloadPath,
-    gate: { status: 'unavailable', error: 'metrics unavailable' },
-    metricsError: 'metrics unavailable'
+    downloadPath
   }
 }
 

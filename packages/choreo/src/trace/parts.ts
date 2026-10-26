@@ -24,6 +24,9 @@ export interface PartMm {
   pads: number
   /** centre-to-centre pad spacing, mm (nearest neighbour, median) */
   pitch: number
+  /** a vertical pin header's pins, board mm, standing pinZ mm above the board */
+  pins?: Vec2[] | undefined
+  pinZ?: number | undefined
 }
 
 const SKIP = /^(H|MH|TP|FID|G|LOGO|REF|#|NT|JP\d|MK|KEY|SH)/i
@@ -33,7 +36,7 @@ function kindOf(ref: string, value: string | undefined, nPads: number, tht: bool
   const v = (value ?? '').toUpperCase()
   if (/^(U|IC)\d/.test(r) || (/^Q\d/.test(r) && nPads >= 3)) return 'ic'
   if (/^(Y|X|XTAL|OSC)\d/.test(r) || /MHZ|XTAL|CRYSTAL/.test(v)) return 'xtal'
-  if (/^(LED|D)\d/.test(r) && /LED/.test(v + r)) return 'led'
+  if (/^(LED|D)\d/.test(r) && /LED|WS28|SK68|APA10/.test(v + r)) return 'led'
   if (/^D\d/.test(r)) return 'diode'
   if (/^(J|P|CN|CON|USB|X)\d/.test(r)) return 'conn'
   if (/^(SW|S|BTN|K)\d/.test(r)) return 'switch'
@@ -56,6 +59,7 @@ const HEIGHT: Record<PartKind, (w: number, h: number) => number> = {
   can: (w, h) => Math.min(9, 1.2 * Math.min(w, h)),
   // a noval tube stands about 2.2 bulb diameters tall
   valve: (w, h) => 2.2 * Math.min(w, h),
+  pin: () => 8.5,
   other: (w, h) => Math.min(1.5, 0.4 + 0.15 * Math.min(w, h))
 }
 
@@ -85,7 +89,9 @@ export function extractParts(board: BoardModel): PartMm[] {
     const body = bodyOf(fp, pads.map((p) => p.pad), fp.silkRefs.flatMap((id) => silkById.get(id) ?? []))
     if (body === undefined) continue
     const tht = pads.some((p) => p.layers > 1)
-    const kind = tht && onCircle(pads.map((p) => p.pad.pos)) ? 'valve' : kindOf(fp.ref, fp.value, pads.length, tht, body.span)
+    // KiCad's own 3D model names a vertical header or socket: a plastic housing, pins standing out of a header
+    const header = /^Pin(Header|Socket)_(\d+)x\d+_P([\d.]+)mm_(Vertical|Horizontal)/.exec(fp.model ?? '')
+    const kind = header !== null ? 'conn' : tht && onCircle(pads.map((p) => p.pad.pos)) ? 'valve' : kindOf(fp.ref, fp.value, pads.length, tht, body.span)
     // two-pad passives sit between their pads, not over them
     let { w, h } = body
     if ((kind === 'res' || kind === 'cap' || kind === 'ind' || kind === 'diode' || kind === 'led') && pads.length === 2 && !tht) {
@@ -106,6 +112,9 @@ export function extractParts(board: BoardModel): PartMm[] {
       h = d
       centre = circleOf(pts)
     }
+    const pitchMm = Number(header?.[3] ?? 2.54)
+    const lying = header?.[4] === 'Horizontal'
+    const male = header?.[1] === 'Header' && !lying
     out.push({
       ref: fp.ref,
       value: fp.value,
@@ -113,7 +122,9 @@ export function extractParts(board: BoardModel): PartMm[] {
       w,
       h,
       rot: fp.rot,
-      z: HEIGHT[kind](w, h),
+      // a right-angle part lies on its side: as tall as its rows
+      z: header === null ? HEIGHT[kind](w, h) : lying ? Number(header[2]) * pitchMm + 0.4 : (male ? 2.5 : 8.5) * pitchMm / 2.54,
+      ...(male ? { pins: pads.map((p) => p.pad.pos), pinZ: 8.5 * pitchMm / 2.54 } : {}),
       kind,
       back: fp.layer.startsWith('B.'),
       pads: pads.length,

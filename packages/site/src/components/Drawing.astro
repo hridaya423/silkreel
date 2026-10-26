@@ -24,6 +24,7 @@ const then = 'The same file, as a film.'
     --bp: #123f86;
     --bp-ink: #eaf1ff;
     --film: 0;
+    --land: 0;
     position: relative; z-index: 1;
     background: color-mix(in srgb, var(--bp), var(--stock) calc(var(--film) * 100%)); color: var(--bp-ink);
   }
@@ -33,7 +34,7 @@ const then = 'The same file, as a film.'
   .dwg__track { height: 640vh; }
   .dwg__pin { position: sticky; top: 72px; height: calc(100dvh - 72px); overflow: hidden; }
   .dwg__sheet { width: 100%; height: 100%; outline: none; opacity: calc(1 - var(--film)); }
-  .dwg__then { position: absolute; left: var(--gutter); bottom: var(--gutter); font-size: clamp(1rem, 0.6rem + 1.4vw, 1.75rem); opacity: clamp(0, var(--film) * 2 - 1, 1); }
+  .dwg__then { position: absolute; left: var(--gutter); bottom: var(--gutter); font-size: clamp(1rem, 0.6rem + 1.4vw, 1.75rem); opacity: clamp(0, min(var(--film) * 2 - 1, 1 - var(--land) * 4), 1); }
   .dwg__sheet:focus-visible { outline: 1px solid var(--bp-ink); outline-offset: -6px; }
 
   .dwg__sheet :global(.bp) { display: block; width: 100%; height: 100%; overflow: visible; --g: var(--bp); --i: var(--bp-ink); }

@@ -112,6 +112,8 @@ export interface Knobs {
   tempo?: number
 }
 
+export type MaskColor = 'green' | 'black' | 'white' | 'blue' | 'red' | 'yellow' | 'purple'
+
 export interface FilmConfig {
   style?: StyleId
   aspect?: Aspect
@@ -128,6 +130,10 @@ export interface FilmConfig {
   duration: 'auto' | number
   output: { width: number; height: number; fps: number }
   cast?: CastHints
+  /** footprint reference of the hero part; replaces the automatic pick */
+  hero?: string
+  /** solder mask colour; replaces the colour the board file declares */
+  mask?: MaskColor
 }
 
 export interface TimelineWarning {
@@ -249,7 +255,7 @@ export interface TraceActs {
   hold: [number, number]
 }
 
-export type PartKind = 'ic' | 'res' | 'cap' | 'ind' | 'diode' | 'led' | 'xtal' | 'conn' | 'switch' | 'can' | 'valve' | 'other'
+export type PartKind = 'ic' | 'res' | 'cap' | 'ind' | 'diode' | 'led' | 'xtal' | 'conn' | 'switch' | 'can' | 'valve' | 'pin' | 'other'
 
 /** a component body, plane px; z is its height */
 export interface TracePart {
@@ -266,6 +272,10 @@ export interface TracePart {
   hero?: boolean | undefined
   /** pin pitch, px (connectors: the pins drawn on top) */
   pitch?: number | undefined
+  /** a header pin: the height of the housing it stands in, px; it falls with the housing */
+  seat?: number | undefined
+  /** an LED's light at power-on: its colour, and a gain that drops where LEDs crowd */
+  led?: { color: string; gain: number } | undefined
 }
 
 /** a screen-space caption pinned to a board point */
@@ -295,7 +305,6 @@ export interface TraceBeats {
   zones: [number, number]
   silk: [number, number]
   hold: [number, number]
-  fade: [number, number]
 }
 export interface TraceScene {
   outline: FlatPath[]

@@ -1,5 +1,5 @@
 import React from 'react'
-import { AbsoluteFill, getRemotionEnvironment, useCurrentFrame, useVideoConfig } from 'remotion'
+import { AbsoluteFill, cancelRender, getRemotionEnvironment, useCurrentFrame, useVideoConfig } from 'remotion'
 import type { Timeline } from '@silk-reel/choreo'
 import { drawFrame, buildScene, postOptionsFor } from './film'
 import type { Scene } from './film'
@@ -74,6 +74,9 @@ export const Film: React.FC<FilmProps> = ({ timeline, grain = true, quality, chi
   React.useLayoutEffect(() => {
     postRef.current = createPost() ?? null
     if (timeline.style === 'trace') traceRef.current = createTraceGL(timeline.width, timeline.height, QUALITY[level]) ?? null
+    if (timeline.style === 'trace' && traceRef.current === null && getRemotionEnvironment().isRendering) {
+      cancelRender(new Error('The trace look needs WebGL2, and the headless browser has none. Run again with SILK_REEL_GL=swangle (slower, CPU only), or use --style glyph.'))
+    }
     readyRef.current = true
     return () => {
       postRef.current?.dispose()
@@ -94,9 +97,7 @@ export const Film: React.FC<FilmProps> = ({ timeline, grain = true, quality, chi
       target.clearRect(0, 0, canvas.width, canvas.height)
       target.drawImage(out, 0, 0)
       drawAnnotations(target, traceRef.current.annotations(), canvas.width, canvas.height)
-      const p = frame / timeline.totalFrames
-      const fade = 1 - Math.min(1, Math.max(0, (p - timeline.scene.beats.fade[0]) / (timeline.scene.beats.fade[1] - timeline.scene.beats.fade[0])))
-      drawTitle(target, timeline, p, fade)
+      drawTitle(target, timeline, frame / timeline.totalFrames, 1)
       return
     }
     const ctx = offscreen.getContext('2d')

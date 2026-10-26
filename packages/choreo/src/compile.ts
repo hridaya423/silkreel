@@ -22,9 +22,12 @@ export function compileTimeline(board: BoardModel, config: FilmConfig): Timeline
     transparent: resolved.transparent,
     seedUsed: seed
   }
+  const heroWarnings = resolved.hero !== undefined && !board.footprints.some((f) => f.ref === resolved.hero)
+    ? [{ code: 'hero-not-found', message: `no part ${resolved.hero} on this board; the hero is picked automatically` }]
+    : []
   if (resolved.style === 'trace') {
     const t = buildTraceScene(board, resolved, seed)
-    return { ...base, style: 'trace', scene: t.scene, warnings: [...duration.warnings, ...resolved.knobWarnings, ...t.warnings] }
+    return { ...base, style: 'trace', scene: t.scene, warnings: [...duration.warnings, ...resolved.knobWarnings, ...heroWarnings, ...t.warnings] }
   }
   const film = composeFilm(board, resolved, seed, duration.durationSeconds)
   const safe = safeArea(resolved.width, resolved.height, resolved.title !== undefined)
@@ -33,6 +36,6 @@ export function compileTimeline(board: BoardModel, config: FilmConfig): Timeline
     style: 'glyph',
     ...film,
     stageAspect: safe.w / safe.h,
-    warnings: [...duration.warnings, ...resolved.knobWarnings, ...film.warnings]
+    warnings: [...duration.warnings, ...resolved.knobWarnings, ...heroWarnings, ...film.warnings]
   }
 }

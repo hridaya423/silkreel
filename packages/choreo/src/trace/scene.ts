@@ -2,16 +2,18 @@ import type { BBox, BoardModel, Pad, Vec2 } from '@silk-reel/ingest'
 import { fitBoard, safeArea } from '../layout'
 import type { ResolvedConfig } from '../config'
 import type {
-  CameraKey, CameraShot, FlatPath, Palette, TraceActs, TraceBeats, TraceCallout, TraceGroup, TraceLayer, TraceMaterial,
+  CameraKey, CameraShot, FlatPath, TraceActs, TraceBeats, TraceCallout, TraceGroup, TraceLayer, TraceMaterial,
   TracePad, TracePart, TraceScene, TraceText, TraceVia, TraceZone, TimelineWarning
 } from '../types'
 import { makeRng } from '../rng'
 import { fitZoom } from './camera'
 import { growthSchedule } from './graph'
 import type { GraphLink, GraphSeg, GraphSeed } from './graph'
+import { DEMO_MASKS } from '../hints'
 import { pickHero } from './hero'
 import { groupNets } from './nets'
 import { extractParts } from './parts'
+import type { PartMm } from './parts'
 import type { NetKind } from './nets'
 
 const B = 1 / 24
@@ -28,8 +30,8 @@ export const TRACE_ACTS: TraceActs = {
   pour: [5 * B, 6.5 * B],
   mask: [6.5 * B, 9.5 * B],
   silk: [9 * B, 10.5 * B],
-  place: [10 * B, 12.5 * B],
-  reflow: [12.5 * B, 14 * B],
+  place: [10 * B, 13.5 * B],
+  reflow: [13.5 * B, 15 * B],
   power: [16 * B, 22 * B],
   hold: [22 * B, 24 * B]
 }
@@ -41,9 +43,8 @@ const TRACE_BEATS: TraceBeats = {
   growth: TRACE_ACTS.draw,
   zones: TRACE_ACTS.pour,
   silk: TRACE_ACTS.silk,
-  // the title card arrives with the poster cut, two seconds before the fade
-  hold: [20 * B, 23.4 * B],
-  fade: [23.4 * B, 1]
+  // the title card arrives with the poster cut; the film ends on the held poster
+  hold: [20 * B, 1]
 }
 
 /** when each role's energy first crosses it after power-on; ground stays dark */
@@ -134,7 +135,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const acts = TRACE_ACTS
   const box = contentBox(board)
   const fit = fitBoard(box, resolved.width, resolved.height, resolved.title !== undefined)
-  const hero = pickHero(board, resolved.cast)
+  const hero = pickHero(board, resolved.cast, resolved.hero)
   const originMm = hero?.center ?? {
     x: (box.min.x + box.max.x) / 2,
     y: (box.min.y + box.max.y) / 2
@@ -417,30 +418,40 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const [pl0, pl1] = acts.place
   const [rf0, rf1] = acts.reflow
   const prng = makeRng(seed, 'trace-paste')
-  const parts: TracePart[] = partsMm.map((pt, i) => {
+  const leds = partsMm.filter((pt) => pt.kind === 'led')
+  const parts: TracePart[] = partsMm.flatMap((pt, i) => {
     const m = map(pt.pos)
     const isHero = pt === heroPart
     const label = pt.kind === 'ic' && pt.value !== undefined ? pt.value.replace(/_/g, '-').toUpperCase().slice(0, 22) : undefined
     const w = pt.w * fit.scale
     const h = pt.h * fit.scale
     const off = (isHero ? 0.05 : 0.14) * Math.min(w, h)
-    return {
+    const t = isHero ? pl0 + 0.75 * B : pl0 + 1.5 * B + (rankOf.get(i) ?? 0) * (pl1 - pl0 - 1.5 * B)
+    const settle = rf0 + Math.min(1, Math.max(0, (m.x - bx0) / Math.max(1, bx1 - bx0))) * (rf1 - rf0 - 0.5 * B)
+    const skew: [number, number, number] = [prng.range(-off, off), prng.range(-off, off), prng.range(-1, 1) * (isHero ? 1.5 : 5) * DEG]
+    const body: TracePart = {
       x: m.x, y: m.y, w, h, rot: rotOf(pt.rot), z: pt.z * fit.scale,
       kind: pt.kind,
-      t: isHero ? pl0 + 0.75 * B : pl0 + 1.5 * B + (rankOf.get(i) ?? 0) * (pl1 - pl0 - 1.5 * B),
-      settle: rf0 + Math.min(1, Math.max(0, (m.x - bx0) / Math.max(1, bx1 - bx0))) * (rf1 - rf0 - 0.5 * B),
-      skew: [prng.range(-off, off), prng.range(-off, off), prng.range(-1, 1) * (isHero ? 1.5 : 5) * DEG],
+      t,
+      settle,
+      // through-hole pins hold a header square: it never floats on the paste
+      skew: pt.pins === undefined ? skew : [0, 0, 0],
       label,
       pitch: pt.kind === 'conn' && pt.pitch > 0 ? pt.pitch * fit.scale : undefined,
+      led: pt.kind === 'led' ? ledLight(pt, leds) : undefined,
       hero: isHero
     }
+    const pinW = 0.64 * (pt.pinZ ?? 0) / 8.5 * fit.scale
+    return [body, ...(pt.pins ?? []).map((pin): TracePart => ({
+      ...map(pin), w: pinW, h: pinW, rot: body.rot, z: (pt.pinZ ?? 0) * fit.scale, kind: 'pin', t, settle, skew: [0, 0, 0], seat: body.z
+    }))]
   })
 
   const callouts: TraceCallout[] = []
   const heroBody = parts.find((pt) => pt.hero === true)
   if (hero !== undefined && heroBody !== undefined) {
     const value = board.footprints.find((f) => f.ref === hero.ref)?.value
-    callouts.push({ t0: heroBody.t + 0.5 * B, t1: rf1 - 0.002, x: origin.x, y: origin.y, text: hero.ref, sub: value })
+    callouts.push({ t0: heroBody.t + 0.5 * B, t1: rf1 - 0.002, x: origin.x, y: origin.y, text: hero.ref, sub: partNumber(value) })
   }
 
   const minWH = Math.min(resolved.width, resolved.height)
@@ -459,7 +470,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       beats,
       groups: sched.groups,
       board: loopsPx,
-      material: material(board, resolved.palette, fit.scale),
+      material: material(board, resolved, fit.scale),
       shots: shotList(resolved, {
         hero: origin,
         heroSize: heroPart === undefined ? 0.08 * minWH : Math.max(heroPart.w, heroPart.h) * fit.scale,
@@ -607,13 +618,15 @@ function boardLoops(board: BoardModel): Vec2[][] {
 }
 
 /** the board's own mask and finish under the copper palette; the stylised palettes tint them */
-function material(board: BoardModel, palette: Palette, pxPerMm: number): TraceMaterial {
+function material(board: BoardModel, resolved: ResolvedConfig, pxPerMm: number): TraceMaterial {
+  const palette = resolved.palette
   const trueColour = palette.copper === '#d08a4c'
-  const mask = board.stackup.maskColor?.toLowerCase()
+  // a board that declares no colour is most likely the fab's default green
+  const mask = resolved.mask ?? board.stackup.maskColor?.toLowerCase() ?? DEMO_MASKS[board.source.boardName] ?? 'green'
   const finishKey = board.stackup.finish?.toLowerCase() ?? ''
   const finish = Object.entries(FINISH).find(([k]) => finishKey.startsWith(k))?.[1]
   const maskHex: string = trueColour
-    ? (mask === undefined ? '#0c0d0e' : (mask.startsWith('#') ? mask : (MASK_ALBEDO[mask] ?? '#0d3b22')))
+    ? (mask.startsWith('#') ? mask : (MASK_ALBEDO[mask] ?? '#0d3b22'))
     : mixHex(palette.bg, palette.copperDim, 0.45)
   // white boards print black legends; everything else prints white
   const silk = luma(maskHex) > 0.5 ? '#1b1c1e' : '#eeeee8'
@@ -637,6 +650,30 @@ function luma(hex: string): number {
   return 0.2126 * c(0) + 0.7152 * c(1) + 0.0722 * c(2)
 }
 
+/** a value worth printing under the ref: a part number like ICE40HX8K-BG121, not a library name like Conn_01x02_Pin */
+export function partNumber(value: string | undefined): string | undefined {
+  const v = value?.trim() ?? ''
+  if (!/^[A-Z0-9][A-Z0-9.+/-]{2,}$/i.test(v) || !/\d/.test(v) || !/[A-Z]/i.test(v)) return undefined
+  return v.length > 20 ? `${v.slice(0, 19)}…` : v
+}
+
+const LED_COLOURS: Array<[RegExp, string]> = [
+  [/RED/, '#ff2a14'],
+  [/GREEN|GRN/, '#2cff5a'],
+  [/BLUE|BLU/, '#2f6bff'],
+  [/YELLOW|YEL/, '#ffd22a'],
+  [/AMBER|ORANGE/, '#ff8c1a'],
+  [/WHITE|WHT|WS28|SK68|APA10|RGB/, '#fff1e2']
+]
+
+/** an LED lights in the colour its value names; a crowd of LEDs shares its light, so a matrix stays a grid of points */
+function ledLight(led: PartMm, leds: PartMm[]): { color: string; gain: number } {
+  const value = (led.value ?? '').toUpperCase()
+  const reach = 3 * Math.max(led.w, led.h)
+  const near = leds.filter((o) => o !== led && Math.hypot(o.pos.x - led.pos.x, o.pos.y - led.pos.y) < reach).length
+  return { color: LED_COLOURS.find(([re]) => re.test(value))?.[1] ?? '#ffb070', gain: 1 / Math.sqrt(1 + 0.5 * near) }
+}
+
 interface ShotInput {
   hero: Vec2
   /** hero body's long side, px */
@@ -652,8 +689,10 @@ interface ShotInput {
  *             it, pulling back to the whole board, then tilting down into a
  *             three-quarter as the mask coats: the drawing becomes an object
  *  2 bench  — low and close on the hero: parts set down, the reflow snap
- *  3 wide   — the held breath, then power-on, under a slow arc
- *  4 poster — cut to the other side on the bar while the board runs, a slow push
+ *  3 alive  — the held breath, then power-on, close on the hero's half of the
+ *             board under a slow arc, so the first light reads on a phone
+ *  4 poster — cut wide to the other side on the bar: the whole running board,
+ *             a slow push, held to the last frame
  * Every framing is solved against the board's real extent, so long boards
  * and tall frames fill the shot instead of floating in it.
  */
@@ -697,10 +736,10 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 34 * D, yaw: -heroYaw * 0.7, aperture: 0.04, shift }
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
-  // a long board is a thin strip in a wide shot: power-on frames the hero's end of it
+  // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
-  const alive = long ? { ...wide, x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2 } : wide
-  const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1)
+  const alive = { ...wide, x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2 }
+  const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1.4)
   return [
     { t: 0, ...si.hero, zoom: macro, tilt: 0.5 * D, yaw: -4 * D, aperture: 0.02 },
     { t: a.draw[1], ...plan, zoom: fit(plan, 1.04) },

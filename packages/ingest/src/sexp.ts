@@ -33,7 +33,7 @@ class Source {
   }
 
   fail(reason: string): never {
-    throw new ParseError(this.file, `${reason} (at offset ${this.pos})`, this.pos)
+    throw new ParseError(this.file, `the file is damaged or cut off (${reason} at offset ${this.pos})`, this.pos)
   }
 }
 
@@ -93,7 +93,7 @@ function parseList(src: Source): SExprNode[] {
     if (src.atEnd()) {
       throw new ParseError(
         src.file,
-        `unbalanced parenthesis: list opened at offset ${openPos} never closed`,
+        `the file is cut off: the list opened at offset ${openPos} never closes`,
         openPos
       )
     }
@@ -119,10 +119,10 @@ function parseNode(src: Source): SExprNode {
 export function parseSExpr(text: string, file: string): SExprNode[] {
   const src = new Source(text, file)
   skipWhitespace(src)
-  if (src.atEnd()) throw new ParseError(file, 'input is empty', 0)
+  if (src.atEnd()) throw new ParseError(file, 'the file is empty', 0)
   const code = src.peek()
   if (code !== OPEN_PAREN) {
-    throw new ParseError(file, 'input does not look like an s-expression document', src.pos)
+    throw new ParseError(file, 'it is not a KiCad board file', src.pos)
   }
   const root = parseList(src)
   skipWhitespace(src)

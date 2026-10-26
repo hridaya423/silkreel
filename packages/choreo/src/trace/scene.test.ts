@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../config'
 import type { Aspect, FilmConfig } from '../types'
-import { buildTraceScene } from './scene'
+import { buildTraceScene, partNumber } from './scene'
 import { boardModel } from '../../test/helpers'
 
 const BOARDS = [
@@ -105,5 +105,17 @@ describe('buildTraceScene performance', () => {
     const ms = performance.now() - t0
     console.log(`buildTraceScene(video) = ${ms.toFixed(0)}ms`)
     expect(ms).toBeLessThan(4000)
+  })
+})
+
+describe('hero caption', () => {
+  it('prints part numbers and drops library names', () => {
+    expect(partNumber('ICE40HX8K-BG121')).toBe('ICE40HX8K-BG121')
+    expect(partNumber('NE555')).toBe('NE555')
+    expect(partNumber('Conn_01x02_Pin')).toBeUndefined()
+    expect(partNumber('Bus_DDR4_SODIMM_CUSTOM_Jetson-Orin-H9.2mm-socket')).toBeUndefined()
+    expect(partNumber('Power')).toBeUndefined()
+    expect(partNumber('100nF')).toBe('100nF')
+    expect(partNumber('STM32F407VGT6TR-EXTRA-LONG')).toBe('STM32F407VGT6TR-EXT…')
   })
 })

@@ -73,6 +73,8 @@ export interface Footprint {
   layer: string
   padRefs: string[]
   silkRefs: string[]
+  /** file name of the first 3D model, without folder or extension, e.g. PinHeader_1x07_P2.54mm_Vertical */
+  model?: string | undefined
 }
 
 

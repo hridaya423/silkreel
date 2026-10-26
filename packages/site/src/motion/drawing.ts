@@ -13,9 +13,8 @@ const STROKE = 0.45
 const HOLD = 0.32
 // after the last stop the drawing hands over to the film: the scroll beyond the camera's stops, in stop units
 const FILM = 0.8
-// where the board sits in the film's frame at FROM seconds, as fractions of the frame (measured on glasgow-540.mp4)
-const FROM = 2.5
-const IN_FRAME = { x: 220 / 1280, y: 84 / 720, w: 833 / 1280 }
+// where the board's plan sits in the glyph film's frame during its plan act, as fractions of the frame (measured on glasgow-16x9.json)
+const IN_FRAME = { x: 0.209, y: 0.186, w: 0.582 }
 // the header's height: the pin sits under it
 const TOP = 72
 
@@ -34,18 +33,21 @@ export function setupDrawing() {
   near.observe(root)
 }
 
-function plot(svg: SVGSVGElement) {
+function plot(svg: SVGSVGElement): { end: number; anims: Animation[] } {
+  const anims: Animation[] = []
   const timing = (at: number, d: number): KeyframeAnimationOptions => ({ delay: at * 1000, duration: d * 1000, easing: 'cubic-bezier(0.45, 0, 0.55, 1)', fill: 'backwards' })
   for (const [group, start, span] of PLOT) {
     const els = [...svg.querySelectorAll<SVGElement>(`[data-plot="${group}"] :is(path, rect, circle, ellipse)`)]
     els.forEach((el, i) => {
       const at = start + (span * i) / Math.max(1, els.length)
-      if (!el.hasAttribute('pathLength')) { el.animate([{ opacity: 0 }, { opacity: 1 }], timing(at, 0.4)); return }
+      if (!el.hasAttribute('pathLength')) { anims.push(el.animate([{ opacity: 0 }, { opacity: 1 }], timing(at, 0.4))); return }
       el.style.strokeDasharray = '1'
-      void el.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], timing(at, STROKE)).finished.then(() => el.style.removeProperty('stroke-dasharray'))
+      const a = el.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], timing(at, STROKE))
+      anims.push(a)
+      void a.finished.then(() => el.style.removeProperty('stroke-dasharray'))
     })
   }
-  return Math.max(...PLOT.map(([, s, d]) => s + d)) + STROKE
+  return { end: Math.max(...PLOT.map(([, s, d]) => s + d)) + STROKE, anims }
 }
 
 function mount(root: HTMLElement, D: typeof import('../blueprint/draw'), b: Board) {
@@ -65,11 +67,12 @@ function mount(root: HTMLElement, D: typeof import('../blueprint/draw'), b: Boar
   const hy = L.plan.y + (L.hero.y - bb.y0) * L.plan.s
   const portrait = innerWidth < 760 && innerWidth < innerHeight
   const stops: Rect[] = portrait ? [V.plan, [hx - 60, hy - 60, 120, 120], V.section, V.detail, V.title, V.plan] : [V.sheet, V.plan, V.section, V.detail, V.title, V.plan]
-  const film = document.querySelector<HTMLVideoElement>('[data-look-video]')
+  const film = document.querySelector<HTMLCanvasElement>('[data-look-film]')
 
   // plotted once, the first time the sheet is on screen
   let idle = false
   let plotted = reduced
+  let plotting: { end: number; anims: Animation[] } | null = null
   if (!reduced) svg.style.visibility = 'hidden'
 
   // the cut, in board mm
@@ -135,18 +138,19 @@ function mount(root: HTMLElement, D: typeof import('../blueprint/draw'), b: Boar
     return [mx - w / 2, my - h / 2, w, h]
   }
   let lastView = ''
-  // the film is the trace look's own video. It lies over the plan, its board scaled and placed onto the drawn outline,
+  // the film is the glyph look's own canvas. It lies over the plan, its plan act placed onto the drawn outline,
   // opens out to a centred frame once the drawing has faded, then zooms out into its frame in the looks below
   const slot = film?.parentElement
-  const ground = (video: HTMLVideoElement) => {
+  const ground = (video: HTMLElement) => {
     video.classList.remove('is-flying')
     for (const k of ['transform', 'opacity', '--fe']) video.style.removeProperty(k)
   }
-  const place = (video: HTMLVideoElement, frame: HTMLElement, handover: number, r: DOMRect) => {
+  const place = (video: HTMLElement, frame: HTMLElement, handover: number, r: DOMRect) => {
     // the landing starts as the pin lets go and ends with the frame settled on screen
     const s = frame.getBoundingClientRect()
     const settle = Math.max(TOP + 40, innerHeight - s.height - 160)
     const land = clamp((innerHeight - r.bottom) / Math.max(1, innerHeight + s.top - r.bottom - settle))
+    section.style.setProperty('--land', land.toFixed(3))
     const m = svg.getScreenCTM()
     if (handover === 0 || land === 1 || !m) { ground(video); return }
     const a = new DOMPoint(L.plan.x, L.plan.y).matrixTransform(m)
@@ -168,15 +172,13 @@ function mount(root: HTMLElement, D: typeof import('../blueprint/draw'), b: Boar
     video.style.opacity = handover.toFixed(3)
     video.style.setProperty('--fe', (1 - l).toFixed(3))
   }
-  const roll = (video: HTMLVideoElement, handover: number) => {
-    if (video.preload !== 'auto') video.preload = 'auto'
-    if (handover > 0.02 && video.paused) {
-      if (video.currentTime < FROM) video.currentTime = FROM
-      void video.play().catch(() => undefined)
-    } else if (handover === 0 && video.currentTime > FROM + 0.05) {
-      video.pause()
-      video.currentTime = FROM
-    }
+  // the looks section owns the film's player: it starts the plan act when the hand-off begins and rewinds it when the reader scrolls back
+  let rolling = false
+  const roll = (canvas: HTMLCanvasElement, handover: number) => {
+    const on = handover > 0.02 || (rolling && handover > 0)
+    if (on === rolling) return
+    rolling = on
+    canvas.dispatchEvent(new CustomEvent('handover', { detail: on }))
   }
   // the tick runs while the drawing or the film's frame is on screen
   const seen = new Set<Element>()
@@ -195,10 +197,22 @@ function mount(root: HTMLElement, D: typeof import('../blueprint/draw'), b: Boar
         place(film, slot, handover, r)
         if (u > stops.length - 2) roll(film, handover)
       }
-      if (!plotted && r.top < innerHeight * 0.4) {
+      if (!plotted && r.top < innerHeight * 0.75) {
         plotted = true
         svg.style.removeProperty('visibility')
-        lastInput = performance.now() + plot(svg) * 1000 - 3000
+        plotting = plot(svg)
+        lastInput = performance.now() + plotting.end * 1000 - 3000
+      }
+      // a fast scroller never sees a half-drawn sheet: the plot is complete before the camera leaves the first view
+      if (plotting) {
+        const due = plotting.end * 1000 * clamp(u / (HOLD * 0.8))
+        let done = true
+        for (const a of plotting.anims) {
+          const t = Number(a.currentTime ?? 0)
+          if (t < due) a.currentTime = due
+          if (a.playState !== 'finished') done = false
+        }
+        if (done) plotting = null
       }
       if (plotted && !reduced && !idle && now - lastInput > 3000) { idle = true; t0 = now - phaseOf(cy) }
       if (idle) {

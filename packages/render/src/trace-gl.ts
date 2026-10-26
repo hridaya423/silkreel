@@ -252,17 +252,18 @@ void main(){
 const VS_PART = `#version 300 es
 in vec4 aBox;   // plane x, y, w, h
 in vec4 aMeta;  // rot, height px, kind, landing time
-in vec4 aLabel; // atlas cell (col,row), has label, hero
+in vec4 aLabel; // atlas cell (col,row), has label / pin pitch / a pin's housing height, hero
 in vec4 aSkew;  // off-square on the paste: dx, dy px, rotation; settle time
-uniform mat4 uVP; uniform float uP; uniform float uDur; uniform int uRound;
-out vec3 vW; out vec3 vN; out vec3 vL; flat out vec4 vMeta; flat out vec4 vLabel; flat out vec2 vSize; flat out float vRot;
+in vec4 aLed;   // an LED's linear colour and gain
+uniform mat4 uVP; uniform float uP; uniform float uDur; uniform int uRound; uniform float uFall;
+out vec3 vW; out vec3 vN; out vec3 vL; flat out vec4 vMeta; flat out vec4 vLabel; flat out vec2 vSize; flat out float vRot; flat out vec4 vLed;
 const vec3 C[8] = vec3[8](vec3(-.5,-.5,0), vec3(.5,-.5,0), vec3(.5,.5,0), vec3(-.5,.5,0),
                           vec3(-.5,-.5,1), vec3(.5,-.5,1), vec3(.5,.5,1), vec3(-.5,.5,1));
 const int I[36] = int[36](4,5,6, 4,6,7, 0,2,1, 0,3,2, 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7);
 const vec3 FN[6] = vec3[6](vec3(0,0,1), vec3(0,0,-1), vec3(0,-1,0), vec3(1,0,0), vec3(0,1,0), vec3(-1,0,0));
 // mirrors partDrop in trace-maps: fast in, set down gently
 float drop(float t, float p, float hero){
-  float dur = (hero > 0.5 ? 0.75 : 0.3) / 24.0;
+  float dur = (hero > 0.5 ? 0.75 : 0.5) / 24.0;
   float u = (p - (t - dur)) / dur;
   if (u <= 0.0) return 1.0;
   if (u >= 1.0) return 0.0;
@@ -297,8 +298,11 @@ void main(){
   vec2 lp = vec2(c.x * aBox.z, c.y * aBox.w);
   vec2 pp = aBox.xy + aSkew.xy * k + vec2(lp.x * cr - lp.y * sr, lp.x * sr + lp.y * cr);
   // it rides the paste until the reflow, then sinks onto its pads
-  float paste = max(0.0, k) * min(1.5, 0.08 * aMeta.y);
-  float fall = dr * aMeta.y * (aLabel.w > 0.5 ? 5.0 : 6.0);
+  // a header's pins fall and sink with their housing
+  float seat = int(aMeta.z + 0.5) == 12 ? aLabel.z : aMeta.y;
+  float paste = max(0.0, k) * min(1.5, 0.08 * seat);
+  // from a common height, so the smallest passives fall in a visible stack instead of popping in
+  float fall = dr * max(seat * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall);
   vW = vec3(pp.x, -pp.y, fall + paste + c.z * aMeta.y);
   vec2 nn = vec2(n.x * cr - n.y * sr, n.x * sr + n.y * cr);
   vN = vec3(nn.x, -nn.y, n.z);
@@ -307,13 +311,14 @@ void main(){
   vLabel = aLabel;
   vSize = aBox.zw;
   vRot = rot;
+  vLed = aLed;
   gl_Position = dr > 0.999 ? vec4(2.0, 2.0, 2.0, 1.0) : uVP * vec4(vW, 1.0);
 }`
 
 const FS_PART = `#version 300 es
 precision highp float;
-in vec3 vW; in vec3 vN; in vec3 vL; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in float vRot; out vec4 o;
-uniform sampler2D tAtlas; uniform vec2 uCell; uniform vec3 uFinish; uniform vec3 uLed; uniform float uLedOn; uniform float uHeat;
+in vec3 vW; in vec3 vN; in vec3 vL; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in float vRot; flat in vec4 vLed; out vec4 o;
+uniform sampler2D tAtlas; uniform vec2 uCell; uniform vec3 uFinish; uniform float uLedOn; uniform float uHeat;
 ${LIGHTING}
 void main(){
   vec3 V = normalize(uCam - vW);
@@ -367,9 +372,10 @@ void main(){
     alb = vec3(0.025); rough = 0.45;
     float band = smoothstep(0.24, 0.27, along) * (1.0 - smoothstep(0.33, 0.36, along));
     alb = mix(alb, vec3(0.5), band);
-  } else if (kind == 5) {     // LED: milky lens that lights at power-on
-    alb = vec3(0.7, 0.7, 0.66); rough = 0.2;
-    emit = uLed * uLedOn * 2.4 * (0.6 + 0.4 * top);
+  } else if (kind == 5) {     // LED: milky lens that lights at power-on, from its centre, so neighbours keep a dark gap
+    float lens = top * (1.0 - smoothstep(0.3, 0.44, max(abs(vL.x), abs(vL.y))));
+    alb = mix(vec3(0.3, 0.3, 0.28), vLed.rgb, 0.25) * (1.0 - 0.6 * uLedOn * lens); rough = 0.2;
+    emit = vLed.rgb * uLedOn * 3.2 * vLed.a * (lens + 0.1 * (1.0 - top));
   } else if (kind == 6) {     // crystal: a metal can
     alb = vec3(0.72, 0.73, 0.75); metal = 1.0; rough = 0.3;
   } else if (kind == 7) {     // connector: black plastic, a grid of gold pins on top
@@ -380,6 +386,8 @@ void main(){
       float pin = (1.0 - smoothstep(0.32, 0.4, max(cell.x, cell.y))) * step(max(abs(vL.x) * vSize.x - vSize.x * 0.5 + vLabel.z * 0.5, abs(vL.y) * vSize.y - vSize.y * 0.5 + vLabel.z * 0.5), 0.0);
       alb = mix(alb, uFinish * 0.85 + vec3(0.05, 0.04, 0.0), pin); metal = pin; rough = mix(rough, 0.25, pin);
     }
+  } else if (kind == 12) {    // header pin: gold-plated square post
+    alb = vec3(0.95, 0.7, 0.32); metal = 1.0; rough = 0.28;
   } else if (kind == 8) {     // switch: brushed steel cap on a black base
     alb = top > 0.5 ? vec3(0.55, 0.56, 0.58) : vec3(0.03); metal = top; rough = 0.45;
   } else if (kind == 9) {     // electrolytic: aluminium top, dark sleeve
@@ -588,7 +596,7 @@ function footprint(cam: Cam, zPlane: number): Region {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
-const KIND_ID: Record<string, number> = { ic: 0, res: 1, cap: 2, ind: 3, diode: 4, led: 5, xtal: 6, conn: 7, switch: 8, can: 9, other: 10, valve: 11 }
+const KIND_ID: Record<string, number> = { ic: 0, res: 1, cap: 2, ind: 3, diode: 4, led: 5, xtal: 6, conn: 7, switch: 8, can: 9, other: 10, valve: 11, pin: 12 }
 const ROUND = new Set(['can', 'valve'])
 const rank = (kind: string): number => (kind === 'valve' ? 2 : ROUND.has(kind) ? 1 : 0)
 
@@ -781,13 +789,14 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         has = dirX < -0.01 ? 2 : 1
         cell++
       }
-      // connectors carry their pin pitch where ICs carry their marking flag
-      const third = part.kind === 'conn' ? (part.pitch ?? 0) : has
+      // connectors carry their pin pitch and pins their housing height where ICs carry their marking flag
+      const third = part.kind === 'conn' ? (part.pitch ?? 0) : part.kind === 'pin' ? (part.seat ?? 0) : has
       inst.push(
         part.x, part.y, part.w, part.h,
         part.rot, part.z, KIND_ID[part.kind] ?? 10, part.t,
         col, row, third, part.hero === true ? 1 : 0,
-        part.skew[0], part.skew[1], part.skew[2], part.settle
+        part.skew[0], part.skew[1], part.skew[2], part.settle,
+        ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color), part.led.gain])
       )
     }
     g.bindTexture(g.TEXTURE_2D, atlasTex)
@@ -865,7 +874,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const p = frame / tl.totalFrames
       const acts = s.acts
       const span = (a: [number, number]): number => ease((p - a[0]) / (a[1] - a[0]))
-      const fade = 1 - span(s.beats.fade)
       const tallest = Math.max(0, ...s.parts.map((pt) => pt.z))
 
       const cam = makeCam(sampleShot(s.shots, p), W, H)
@@ -956,8 +964,8 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           // bodies: opaque, depth-tested, sampled at the subframe's own time so falls blur
           g.disable(g.BLEND)
           g.bindBuffer(g.ARRAY_BUFFER, partBuf)
-          const stride = 16 * 4
-          const locs = ['aBox', 'aMeta', 'aLabel', 'aSkew'].map((n) => g.getAttribLocation(P.part.p, n))
+          const stride = 20 * 4
+          const locs = ['aBox', 'aMeta', 'aLabel', 'aSkew', 'aLed'].map((n) => g.getAttribLocation(P.part.p, n))
           const point = (first: number): void => {
             for (const [i, loc] of locs.entries()) {
               g.enableVertexAttribArray(loc)
@@ -966,8 +974,8 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
             }
           }
           tex(0, atlasTex)
-          P.part.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds)
-            .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS).v3('uFinish', linear(m.finish)).v3('uLed', warmC)
+          P.part.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
+            .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS).v3('uFinish', linear(m.finish))
             .f('uLedOn', span([acts.power[0], acts.power[0] + 0.01])).f('uHeat', span([acts.power[0], acts.power[0] + 3 / 24]))
           lighting(P.part, c, p, room)
           if (boxCount > 0) {
@@ -1076,14 +1084,14 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const bg = tl.transparent ? [0, 0, 0] : linear(pal.bg).map((v) => Math.pow(v, 1 / 2.2))
       P.final.use().i('tCol', 0).i('tBloom', 1).i('tStreak', 2)
         .f('uBloom', 0.7 * pal.bloom + 0.2).f('uStreak', 0.04).v3('uStreakTint', coolC)
-        .f('uExposure', 1.32 * fade).f('uCA', 0.0012).f('uFrame', frame).i('uGrain', tl.transparent ? 0 : 1)
+        .f('uExposure', 1.32).f('uCA', 0.0012).f('uFrame', frame).i('uGrain', tl.transparent ? 0 : 1)
         .i('uTransparent', tl.transparent ? 1 : 0).v3('uBg', bg).f('uVignette', 0.32)
       g.clearColor(0, 0, 0, 0)
       g.clear(g.COLOR_BUFFER_BIT)
       quad()
       g.finish()
 
-      lastAnnotations = annotate(tl, p, fade)
+      lastAnnotations = annotate(tl, p)
       return canvas
     },
     dispose(): void {
@@ -1093,10 +1101,10 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
 }
 
 /** the captions showing at phase p, faded in and out */
-function annotate(tl: TraceTimeline, p: number, fade: number): Annotation[] {
+function annotate(tl: TraceTimeline, p: number): Annotation[] {
   return tl.scene.callouts
     .filter((c) => p >= c.t0 && p <= c.t1)
-    .map((c) => ({ text: c.text, sub: c.sub, alpha: Math.min(ease((p - c.t0) / 0.012), ease((c.t1 - p) / 0.012)) * fade }))
+    .map((c) => ({ text: c.text, sub: c.sub, alpha: Math.min(ease((p - c.t0) / 0.012), ease((c.t1 - p) / 0.012)) }))
     .filter((a) => a.alpha > 0.01)
 }
 

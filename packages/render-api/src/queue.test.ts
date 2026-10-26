@@ -1,7 +1,6 @@
 import path from 'node:path'
 import { access, rm, writeFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { GateReport } from '@silk-reel/metrics'
 import type { RenderFilmOptions, RenderFilmResult } from './render-film.js'
 import { RenderQueue } from './queue.js'
 import type { RenderJob } from './queue.js'
@@ -13,24 +12,6 @@ afterEach(async () => {
   outputPaths.clear()
 })
 
-function gateReport(file: string, passed: boolean): GateReport {
-  return {
-    file,
-    passed,
-    facts: {
-      width: 1080,
-      height: 1350,
-      fps: 15,
-      durationSeconds: 167 / 15,
-      frameCount: 167,
-      codec: 'h264',
-      pixFmt: 'yuv420p',
-      audioStreamCount: 0
-    },
-    rules: []
-  }
-}
-
 function doneJob(queue: RenderQueue, id: string): Extract<RenderJob, { status: 'done' }> {
   const job = queue.get(id)
   expect(job?.status).toBe('done')
@@ -39,13 +20,12 @@ function doneJob(queue: RenderQueue, id: string): Extract<RenderJob, { status: '
 }
 
 describe('render queue execution', () => {
-  it('runs FIFO with no overlap, reuses the bundle, and preserves downloads across gate outcomes', async () => {
+  it('runs FIFO with no overlap, reuses the bundle, and keeps every download', async () => {
     const events: string[] = []
     const bundleLocations: string[] = []
     let active = 0
     let maxActive = 0
     let bundleCalls = 0
-    let gateCalls = 0
     const render = async (options: RenderFilmOptions): Promise<RenderFilmResult> => {
       const jobId = path.basename(options.outputLocation, '.mp4')
       expect(active).toBe(0)
@@ -55,7 +35,7 @@ describe('render queue execution', () => {
       outputPaths.add(options.outputLocation)
       bundleLocations.push(options.bundleLocationOverride ?? '')
       try {
-        options.onProgress?.(40)
+        options.onProgress?.({ pct: 40, etaSeconds: 3 })
         await new Promise<void>((resolve) => setTimeout(resolve, 1))
         await writeFile(options.outputLocation, 'test video')
       } finally {
@@ -64,14 +44,8 @@ describe('render queue execution', () => {
       }
       return { bundleLocation: options.bundleLocationOverride ?? '', outputLocation: options.outputLocation }
     }
-    const runGate = (videoPath: string): Promise<GateReport> => {
-      gateCalls += 1
-      if (gateCalls === 3) return Promise.reject(new Error('metrics unavailable'))
-      return Promise.resolve(gateReport(videoPath, gateCalls === 1))
-    }
     const queue = new RenderQueue({
       renderFilm: render,
-      runGate,
       bundle: () => {
         bundleCalls += 1
         return Promise.resolve('test-bundle')
@@ -99,14 +73,12 @@ describe('render queue execution', () => {
     expect(bundleLocations).toEqual(['test-bundle', 'test-bundle', 'test-bundle'])
 
     const completed = ids.map((id) => doneJob(queue, id))
-    expect(completed.map((job) => job.gate.status)).toEqual(['passed', 'failed', 'unavailable'])
     expect(completed.map((job) => job.downloadPath)).toEqual([...outputPaths])
     expect(completed.every((job) => job.progress === 100)).toBe(true)
   })
 
-  it('compiles alpha jobs transparent, scales gifs, and gates only mp4', async () => {
+  it('compiles alpha jobs transparent and names the file by format', async () => {
     const seen: RenderFilmOptions[] = []
-    let gateCalls = 0
     const render = async (options: RenderFilmOptions): Promise<RenderFilmResult> => {
       seen.push(options)
       outputPaths.add(options.outputLocation)
@@ -115,10 +87,6 @@ describe('render queue execution', () => {
     }
     const queue = new RenderQueue({
       renderFilm: render,
-      runGate: (videoPath) => {
-        gateCalls += 1
-        return Promise.resolve(gateReport(videoPath, true))
-      },
       bundle: () => Promise.resolve('test-bundle')
     })
     const webm = queue.submit({ demoId: 'ecc83-pp', format: 'webm-alpha' })
@@ -132,8 +100,6 @@ describe('render queue execution', () => {
     expect(m?.outputLocation.endsWith(`${mov.id}.mov`)).toBe(true)
     expect(g?.inputProps.timeline.transparent).toBe(false)
     expect(g?.outputLocation.endsWith(`${gif.id}.gif`)).toBe(true)
-    expect(gateCalls).toBe(0)
-    expect(doneJob(queue, gif.id).gate.status).toBe('unavailable')
     expect(doneJob(queue, gif.id).format).toBe('gif')
   })
 
@@ -154,7 +120,6 @@ describe('render queue execution', () => {
     }
     const options = {
       renderFilm: render,
-      runGate: (videoPath: string) => Promise.resolve(gateReport(videoPath, true)),
       bundle: () => Promise.resolve('test-bundle')
     }
     const firstQueue = new RenderQueue(options)
@@ -173,7 +138,7 @@ describe('render queue execution', () => {
       const id = path.basename(options.outputLocation, '.mp4')
       outputPaths.add(options.outputLocation)
       for (const progress of [50, 20, Number.NaN, 140]) {
-        options.onProgress?.(progress)
+        options.onProgress?.({ pct: progress, etaSeconds: null })
         observed.push(queue.get(id)?.progress ?? -1)
       }
       await writeFile(options.outputLocation, 'test video')
@@ -181,7 +146,6 @@ describe('render queue execution', () => {
     }
     const queue = new RenderQueue({
       renderFilm: render,
-      runGate: (videoPath) => Promise.resolve(gateReport(videoPath, true)),
       bundle: () => Promise.resolve('test-bundle')
     })
     queue.submit({ demoId: 'ecc83-pp' })
@@ -212,7 +176,6 @@ describe('render queue execution', () => {
     }
     const queue = new RenderQueue({
       renderFilm: render,
-      runGate: (videoPath) => Promise.resolve(gateReport(videoPath, true)),
       bundle: () => Promise.resolve('test-bundle')
     })
     const first = queue.submit({ demoId: 'ecc83-pp' })
@@ -230,14 +193,13 @@ describe('render queue execution', () => {
     expect(queue.get(second.id)?.status).toBe('cancelled')
   })
 
-  it('cancels an active render, discards its artifact, and skips the gate', async () => {
+  it('cancels an active render and discards its artifact', async () => {
     let releaseRender: (() => void) | undefined
     let renderStarted: (() => void) | undefined
     let outputLocation: string | undefined
     const started = new Promise<void>((resolve) => {
       renderStarted = resolve
     })
-    let gateCalls = 0
     const render = async (options: RenderFilmOptions): Promise<RenderFilmResult> => {
       outputLocation = options.outputLocation
       outputPaths.add(options.outputLocation)
@@ -250,10 +212,6 @@ describe('render queue execution', () => {
     }
     const queue = new RenderQueue({
       renderFilm: render,
-      runGate: (videoPath) => {
-        gateCalls += 1
-        return Promise.resolve(gateReport(videoPath, true))
-      },
       bundle: () => Promise.resolve('test-bundle')
     })
     const submitted = queue.submit({ demoId: 'ecc83-pp' })
@@ -265,7 +223,6 @@ describe('render queue execution', () => {
     await queue.waitForIdle()
 
     expect(queue.get(submitted.id)?.status).toBe('cancelled')
-    expect(gateCalls).toBe(0)
     expect(outputLocation).toBeDefined()
     await expect(access(outputLocation as string)).rejects.toThrow()
   })

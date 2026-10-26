@@ -3,17 +3,17 @@ import type { FastifyInstance } from 'fastify'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import type { Aspect, FilmConfig, Knobs, PaletteId, StyleId, TitleCard } from '@silk-reel/choreo'
+import { MASK_COLORS } from '@silk-reel/choreo'
+import type { Aspect, FilmConfig, Knobs, MaskColor, PaletteId, StyleId, TitleCard } from '@silk-reel/choreo'
 import { DEMO_BOARDS, boardFromJson, defaultFilmConfig, isDemoBoardId } from './boards.js'
 import { RenderQueue } from './queue.js'
 import type { RenderQueuePort, RenderSubmission } from './queue.js'
-import { runGate } from '@silk-reel/metrics'
 import { FORMAT_EXT, FORMAT_MIME, OUTPUT_FORMATS } from './render-film.js'
 import type { OutputFormat } from './render-film.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..')
 const allowedVideoRoots = [path.join(repoRoot, 'exports'), path.join(repoRoot, 'fixtures')]
-const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'transparent'] as const
+const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'transparent', 'hero', 'mask'] as const
 const CAST_KEYS = ['preferRefs', 'preferTexts'] as const
 const KNOB_KEYS = ['texts', 'tempo'] as const
 const STYLE_IDS: readonly StyleId[] = ['trace', 'glyph']
@@ -57,7 +57,7 @@ type RenderApiError =
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 })
-  const queue = options.queue ?? new RenderQueue({ runGate })
+  const queue = options.queue ?? new RenderQueue()
 
   app.addHook('onReady', async () => {
     await queue.prepare()
@@ -198,6 +198,18 @@ function parseFilmConfig(value: unknown): FilmConfigResult {
     const card: TitleCard = { name: title.name }
     if (title.version !== undefined) card.version = title.version
     config.title = card
+  }
+  if (Object.hasOwn(value, 'hero')) {
+    if (typeof value.hero !== 'string' || value.hero.trim() === '' || value.hero.length > 64) {
+      return { ok: false, error: 'filmConfig.hero must be a footprint reference such as U1' }
+    }
+    config.hero = value.hero
+  }
+  if (Object.hasOwn(value, 'mask')) {
+    if (typeof value.mask !== 'string' || !MASK_COLORS.includes(value.mask as MaskColor)) {
+      return { ok: false, error: `filmConfig.mask must be one of ${MASK_COLORS.join(', ')}` }
+    }
+    config.mask = value.mask as MaskColor
   }
   if (Object.hasOwn(value, 'transparent')) {
     if (typeof value.transparent !== 'boolean') return { ok: false, error: 'filmConfig.transparent must be a boolean' }

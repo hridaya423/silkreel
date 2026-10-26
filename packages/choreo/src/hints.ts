@@ -1,6 +1,9 @@
-import type { CastHints } from './types'
+import type { CastHints, MaskColor } from './types'
 
 /** per-board cast curation for the bundled fixtures — the art director's pick of hero footprints/labels, keyed by board name */
+/** fixture boards whose files declare no mask colour, and the colour the real board is */
+export const DEMO_MASKS: Readonly<Record<string, MaskColor>> = { icebreaker: 'black' }
+
 export const DEMO_CAST_HINTS: Readonly<Record<string, CastHints>> = {
   icebreaker: {
     preferRefs: ['P1', 'SW1', 'SW2', 'SW3', 'SW4', 'J31', 'J33', 'J34', 'U4', 'U5', 'U6'],

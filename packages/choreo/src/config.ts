@@ -2,7 +2,9 @@ import { ChoreoConfigError } from './errors'
 import { clamp } from './curves'
 import { ASPECT_SIZE } from './layout'
 import { PALETTES, resolvePalette } from './palette'
-import type { Aspect, CastHints, FilmConfig, Knobs, Palette, PaletteId, StyleId, TitleCard } from './types'
+import type { Aspect, CastHints, FilmConfig, Knobs, MaskColor, Palette, PaletteId, StyleId, TitleCard } from './types'
+
+export const MASK_COLORS: readonly MaskColor[] = ['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple']
 
 interface ResolvedKnobs {
   texts: number
@@ -23,6 +25,8 @@ export interface ResolvedConfig {
   height: number
   fps: number
   cast?: CastHints | undefined
+  hero?: string | undefined
+  mask?: MaskColor | undefined
   knobWarnings: Array<{ code: string; message: string }>
 }
 
@@ -171,6 +175,16 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     }
   }
 
+  const hero: unknown = config.hero
+  if (hero !== undefined && (typeof hero !== 'string' || hero.trim() === '' || hero.length > 64)) {
+    throw new ChoreoConfigError('hero', hero, 'expected a footprint reference such as U1')
+  }
+
+  const mask: unknown = config.mask
+  if (mask !== undefined && !MASK_COLORS.includes(mask as MaskColor)) {
+    throw new ChoreoConfigError('mask', mask, `expected one of ${MASK_COLORS.join(', ')}`)
+  }
+
   return {
     style,
     aspect,
@@ -185,6 +199,8 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     height,
     fps: output.fps,
     cast: cast,
+    hero: hero?.trim(),
+    mask: mask as MaskColor | undefined,
     knobWarnings
   }
 }

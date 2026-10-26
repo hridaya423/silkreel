@@ -23,17 +23,13 @@ describe('approved trace schedule', () => {
     expect(scene.pads.length).toMatchInlineSnapshot(`1149`)
     expect(scene.beats).toMatchInlineSnapshot(`
       {
-        "fade": [
-          0.9749999999999999,
-          1,
-        ],
         "growth": [
           0,
           0.22916666666666666,
         ],
         "hold": [
           0.8333333333333333,
-          0.9749999999999999,
+          1,
         ],
         "outline": [
           0,

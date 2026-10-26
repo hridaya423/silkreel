@@ -10,6 +10,8 @@ const state = (patch: Partial<StudioState> = {}): StudioState => ({
   palette: undefined,
   accent: undefined,
   title: { name: '', version: '' },
+  hero: undefined,
+  mask: undefined,
   knobs: DEFAULT_KNOBS,
   seed: 42,
   duration: 'auto',
@@ -17,14 +19,21 @@ const state = (patch: Partial<StudioState> = {}): StudioState => ({
 })
 
 describe('preview and export identity', () => {
-  it('exports the resolved preview seed without changing the null-seed control', () => {
+  it('exports the same seed the preview used', () => {
     const board = boardModel('ecc83-pp.kicad_pcb')
-    const config = studioFilmConfig(state({ style: 'glyph', seed: null }))
+    const config = studioFilmConfig(state({ style: 'glyph', seed: 9 }))
     const preview = compileStudioFilm(board, config)
 
-    expect(config.seed).toBeNull()
-    expect(preview.config.seed).toBe(preview.timeline.seedUsed)
+    expect(preview.config.seed).toBe(9)
+    expect(preview.timeline.seedUsed).toBe(9)
     expect(JSON.stringify(compileTimeline(board, preview.config))).toBe(JSON.stringify(preview.timeline))
+  })
+
+  it('passes the hero to both styles and the mask only to trace', () => {
+    expect(studioFilmConfig(state({ hero: 'U2', mask: 'black' }))).toMatchObject({ hero: 'U2', mask: 'black' })
+    const glyph = studioFilmConfig(state({ style: 'glyph', hero: 'U2', mask: 'black' }))
+    expect(glyph.hero).toBe('U2')
+    expect(glyph.mask).toBeUndefined()
   })
 
   it('compiles a 9:16 trace state to a 1080x1920 trace timeline', () => {

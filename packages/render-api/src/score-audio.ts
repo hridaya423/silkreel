@@ -170,7 +170,9 @@ export function traceScore(tl: TraceTimeline): { left: Float32Array; right: Floa
   }
 
   // object: parts click down as they are set, the hero seats with weight
-  const parts = [...s.parts].sort((x, y) => x.t - y.t)
+  // a header's pins land with its housing: one part, one sound
+  const bodies = s.parts.filter((p) => p.kind !== 'pin')
+  const parts = [...bodies].sort((x, y) => x.t - y.t)
   let last = -Infinity
   parts.forEach((p, i) => {
     const at = T(p.t)
@@ -191,7 +193,7 @@ export function traceScore(tl: TraceTimeline): { left: Float32Array; right: Floa
   const sz = Float32Array.from(sizzle, (v, i) => v * Math.min(1, i / fade, (sizzle.length - i) / fade))
   bus.add(T(rf0) - 0.1, sz, 0.22)
   last = -Infinity
-  for (const p of [...s.parts].sort((x, y) => x.settle - y.settle)) {
+  for (const p of [...bodies].sort((x, y) => x.settle - y.settle)) {
     const at = T(p.settle)
     if (at - last < 1 / 16) continue
     last = at

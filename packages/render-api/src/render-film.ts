@@ -1,5 +1,5 @@
 import { bundle } from '@remotion/bundler'
-import { renderMedia, selectComposition } from '@remotion/renderer'
+import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import type { OpenGlRenderer } from '@remotion/renderer'
 import type { FilmInputProps } from '@silk-reel/render'
 import type { TraceTimeline } from '@silk-reel/choreo'
@@ -24,7 +24,8 @@ export const isAlphaFormat = (format: OutputFormat): boolean => format === 'webm
 
 function codecOptions(format: OutputFormat) {
   switch (format) {
-    case 'mp4': return { codec: 'h264' as const, crf: 16, pixelFormat: 'yuv420p' as const, imageFormat: 'png' as const }
+    // a 12 s film with its score stays under a 10 MB chat upload limit
+    case 'mp4': return { codec: 'h264' as const, videoBitrate: '5.5M', pixelFormat: 'yuv420p' as const, imageFormat: 'png' as const }
     case 'gif': return { codec: 'gif' as const, everyNthFrame: 2, imageFormat: 'png' as const }
     case 'webm-alpha': return { codec: 'vp9' as const, pixelFormat: 'yuva420p' as const, imageFormat: 'png' as const }
     case 'prores-alpha': return { codec: 'prores' as const, proResProfile: '4444' as const, pixelFormat: 'yuva444p10le' as const, imageFormat: 'png' as const }
@@ -43,12 +44,23 @@ export interface RenderFilmOptions {
   scale?: number
   /** the synthesised score under a trace film (default on; GIFs never carry audio) */
   audio?: boolean
-  onProgress?: (pct: number) => void
+  onProgress?: (progress: RenderProgress) => void
+  /** the first render downloads a headless Chrome; this reports it once */
+  onBrowserDownload?: (megabytes: number) => void
+  /** also write a trace film's last frame, the held poster, as <name>.poster.png for a cover image */
+  poster?: boolean
+}
+
+export interface RenderProgress {
+  pct: number
+  /** null until enough frames are done to estimate */
+  etaSeconds: number | null
 }
 
 export interface RenderFilmResult {
   bundleLocation: string
   outputLocation: string
+  posterLocation?: string
 }
 
 export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilmResult> {
@@ -59,13 +71,25 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
     throw new Error(`${format} needs a transparent timeline (compile with transparent: true)`)
   }
   let lastPct = -1
+  let firstAt: { t: number; p: number } | undefined
+  let announced = false
+  const onBrowserDownload = () => ({
+    version: null,
+    onProgress: ({ alreadyAvailable, totalSizeInBytes }: { alreadyAvailable: boolean; totalSizeInBytes: number }) => {
+      if (alreadyAvailable || announced) return
+      announced = true
+      options.onBrowserDownload?.(Math.round(totalSizeInBytes / 1e6))
+    }
+  })
   const inputProps = (format === 'gif' ? { ...options.inputProps, grain: false } : options.inputProps) as unknown as Record<string, unknown>
   const composition = await selectComposition({
     serveUrl: bundleLocation,
     id: 'film',
-    inputProps
+    inputProps,
+    onBrowserDownload
   })
-  await renderMedia({
+  const chromiumOptions = { gl: (process.env.SILK_REEL_GL ?? 'angle') as OpenGlRenderer }
+  const render = () => renderMedia({
     composition,
     serveUrl: bundleLocation,
     inputProps,
@@ -74,18 +98,35 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
     scale: options.scale ?? (format === 'gif' ? Math.min(1, 720 / options.inputProps.timeline.width) : 1),
     concurrency: Number(process.env.SILK_REEL_CONCURRENCY) || Math.max(1, Math.floor(os.cpus().length / 2)),
     // angle uses the real GPU for the WebGL2 post pass; SILK_REEL_GL=swangle for GPU-less CI/servers
-    chromiumOptions: { gl: (process.env.SILK_REEL_GL ?? 'angle') as OpenGlRenderer },
+    chromiumOptions,
+    onBrowserDownload,
     onProgress: ({ progress }) => {
       const pct = Math.round(progress * 100)
-      if (pct % 20 !== 0 || pct === lastPct) return
+      if (pct === lastPct) return
       lastPct = pct
-      options.onProgress?.(pct)
+      const now = Date.now()
+      if (firstAt === undefined && progress > 0) firstAt = { t: now, p: progress }
+      const done = firstAt === undefined ? 0 : progress - firstAt.p
+      const etaSeconds = firstAt !== undefined && done > 0.05 ? Math.round(((now - firstAt.t) / done) * (1 - progress) / 1000) : null
+      options.onProgress?.({ pct, etaSeconds })
     }
   })
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await render()
+      break
+    } catch (err) {
+      // Remotion 4.0.539 does not retry a tab whose first page load returns no response; it happens on about one render in eight at concurrency > 1
+      if (attempt === 3 || !(err instanceof Error) || !err.message.includes('but got no response')) throw err
+    }
+  }
   if (format === 'mp4') await normalizeMp4(options.outputLocation)
   const timeline = options.inputProps.timeline
   if (format !== 'gif' && timeline.style === 'trace' && options.audio !== false) await muxScore(options.outputLocation, format, timeline)
-  return { bundleLocation, outputLocation: options.outputLocation }
+  if (options.poster !== true || timeline.style !== 'trace') return { bundleLocation, outputLocation: options.outputLocation }
+  const posterLocation = options.outputLocation.replace(/\.[^./\\]*$/, '') + '.poster.png'
+  await renderStill({ composition, serveUrl: bundleLocation, inputProps, frame: timeline.totalFrames - 1, output: posterLocation, imageFormat: 'png', chromiumOptions })
+  return { bundleLocation, outputLocation: options.outputLocation, posterLocation }
 }
 
 const AUDIO_CODEC: Record<Exclude<OutputFormat, 'gif'>, string[]> = {

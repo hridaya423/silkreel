@@ -269,7 +269,7 @@ function frontRing(l: Light, clip: Path2D, o: { x: number; y: number }, r: numbe
 
 /** how high a part still hangs above its seat: 1 before it drops, 0 once set down */
 function partDrop(t: number, p: number, hero: boolean): number {
-  const dur = (hero ? 0.75 : 0.3) / 24
+  const dur = (hero ? 0.75 : 0.5) / 24
   const u = (p - (t - dur)) / dur
   if (u <= 0) return 1
   if (u >= 1) return 0
@@ -322,6 +322,7 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // max-blended, so a crowd of parts never stacks into a black slab
   fx.globalCompositeOperation = 'lighten'
   for (const part of s.parts) {
+    if (part.kind === 'pin') continue
     const drop = partDrop(part.t, p, part.hero === true)
     if (drop >= 1) continue
     const k = (1 - drop) * Math.min(1, 0.35 + part.z / 30)

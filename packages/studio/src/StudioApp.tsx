@@ -1,14 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import type { Aspect, FilmConfig, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
+import { heroChoices, heroPart, MASK_COLORS, TRACE_ACTS } from '@silk-reel/choreo'
+import type { Aspect, FilmConfig, MaskColor, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
 import { Film } from '@silk-reel/render'
 import { Player } from '@remotion/player'
 import type { PlayerRef } from '@remotion/player'
 import type { BoardModel } from '@silk-reel/ingest'
 import './workspace.css'
-import { ASPECTS, compileStudioFilm, DEFAULT_KNOBS, DEMO_BOARDS, FORMATS, KNOB_RANGES, PALETTE_LIST, STYLES, studioFilmConfig } from './film-config'
+import { ASPECTS, castHints, compileStudioFilm, DEFAULT_KNOBS, DEMO_BOARDS, FORMATS, KNOB_RANGES, PALETTE_LIST, STYLES, studioFilmConfig } from './film-config'
 import type { ExportFormat, StudioKnobs } from './film-config'
-import { cancelJob, downloadUrl, pollJob, submitExport, summarize, useBoardSources, useDebouncedCallback } from './api'
-import type { BoardSummary, ExportJob } from './api'
+import { cancelJob, downloadUrl, pollJob, submitExport, summarize, useBoardSources, useDebouncedCallback, useDemoOutlines, useRenderApi } from './api'
+import type { BoardSummary, DemoOutlines, ExportJob } from './api'
 
 type Screen = 'landing' | 'workspace'
 
@@ -36,7 +37,7 @@ export const StudioApp: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('landing')
   const [summary, setSummary] = useState<BoardSummary | null>(null)
   const [knobs, setKnobs] = useState<StudioKnobs>(DEFAULT_KNOBS)
-  const [seed, setSeed] = useState<number | null>(42)
+  const [seed, setSeed] = useState(42)
   const [duration, setDuration] = useState<'auto' | number>('auto')
   const [look, setLook] = useState<Look>(DEFAULT_LOOK)
   const [format, setFormat] = useState<ExportFormat>('mp4')
@@ -48,6 +49,8 @@ export const StudioApp: React.FC = () => {
   const exportJobIdRef = React.useRef<string | null>(null)
   const exportInFlightRef = React.useRef(false)
   const sources = useBoardSources()
+  const outlines = useDemoOutlines()
+  const apiUp = useRenderApi()
 
   const cancelExport = useCallback(async (showResult: boolean) => {
     const jobId = exportJobIdRef.current
@@ -132,7 +135,7 @@ export const StudioApp: React.FC = () => {
       }, controller.signal)
       if (exportControllerRef.current !== controller) return
       exportJobIdRef.current = jobId
-      currentJob = { jobId, status: 'pending', progress: 0, gatePassed: null, gateDetail: null, error: null }
+      currentJob = { jobId, status: 'pending', progress: 0, etaSeconds: null, error: null }
       setExportState({ status: 'rendering', job: currentJob })
       const job = await pollJob(jobId, {
         signal: controller.signal,
@@ -174,6 +177,7 @@ export const StudioApp: React.FC = () => {
         parsingFile={sources.parsingFile}
         error={sources.error}
         onDismissError={sources.clearError}
+        outlines={outlines}
       />
     )
   }
@@ -204,6 +208,7 @@ export const StudioApp: React.FC = () => {
         setScreen('landing')
       }}
       exportState={exportState}
+      apiUp={apiUp}
       onExport={startExport}
       onCancelExport={() => {
         void cancelExport(true)
@@ -219,7 +224,8 @@ const Landing: React.FC<{
   parsingFile: boolean
   error: string | null
   onDismissError: () => void
-}> = ({ onDemo, onFile, loadingDemo, parsingFile, error, onDismissError }) => {
+  outlines: DemoOutlines | null
+}> = ({ onDemo, onFile, loadingDemo, parsingFile, error, onDismissError, outlines }) => {
   const [dragOver, setDragOver] = useState(false)
   const fileInput = React.useRef<HTMLInputElement>(null)
   const busy = loadingDemo !== null || parsingFile
@@ -305,7 +311,7 @@ const Landing: React.FC<{
             disabled={busy}
           >
             <span className="demo-index">{String(index + 1).padStart(2, '0')}</span>
-            <span className="demo-plot" aria-hidden="true"><i /><i /><i /><i /></span>
+            <DemoPlot outline={outlines?.[demo.id]} />
             <span className="demo-label">{demo.label}</span>
             <span className="demo-detail">{loadingDemo === demo.id ? 'loading…' : demo.detail}</span>
             <span className="demo-cta">open →</span>
@@ -316,6 +322,17 @@ const Landing: React.FC<{
   )
 }
 
+const DemoPlot: React.FC<{ outline: DemoOutlines[string] | undefined }> = ({ outline }) => (
+  <span className="demo-plot" aria-hidden="true">
+    {outline !== undefined && (
+      <svg viewBox={`-2 -2 ${outline.w + 4} ${outline.h + 4}`} preserveAspectRatio="xMidYMid meet">
+        <path d={outline.d} fill="none" stroke="currentColor" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+        {outline.holes.map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} fill="none" stroke="currentColor" strokeWidth={0.6} vectorEffect="non-scaling-stroke" />)}
+      </svg>
+    )}
+  </span>
+)
+
 interface WorkspaceProps {
   summary: BoardSummary
   film: CompiledFilm | null
@@ -323,8 +340,8 @@ interface WorkspaceProps {
   compileStale: boolean
   knobs: StudioKnobs
   onKnobs: (patch: Partial<StudioKnobs>) => void
-  seed: number | null
-  onSeed: (seed: number | null) => void
+  seed: number
+  onSeed: (seed: number) => void
   duration: 'auto' | number
   onDuration: (duration: 'auto' | number) => void
   look: Look
@@ -335,6 +352,7 @@ interface WorkspaceProps {
   exportState: ExportState | null
   onExport: () => Promise<void>
   onCancelExport: () => void
+  apiUp: boolean | null
 }
 
 const Workspace: React.FC<WorkspaceProps> = (props) => {
@@ -358,8 +376,13 @@ const Workspace: React.FC<WorkspaceProps> = (props) => {
             {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
           </select>
         </label>
-        <ExportControl state={props.exportState} onExport={props.onExport} onCancel={props.onCancelExport} disabled={props.compileStale || film === null} />
+        <ExportControl state={props.exportState} onExport={props.onExport} onCancel={props.onCancelExport} disabled={props.compileStale || film === null || props.apiUp === false} />
       </header>
+      {props.apiUp === false && (
+        <div className="error-strip api-down" role="alert">
+          <span>The render API is not running, so export is off. Start it in another terminal: <code>npm run start --workspace=@silk-reel/render-api</code></span>
+        </div>
+      )}
       <div className="workspace-body">
         <section className="player-pane" aria-label="preview">
           {compileError !== null ? (
@@ -379,7 +402,7 @@ const Workspace: React.FC<WorkspaceProps> = (props) => {
               </ul>
             </details>
           )}
-          <LookPanel look={props.look} onLook={props.onLook} disabled={exportBusy} />
+          <LookPanel look={props.look} onLook={props.onLook} disabled={exportBusy} board={summary.board} />
           <KnobPanel
             style={props.look.style}
             knobs={props.knobs}
@@ -506,14 +529,14 @@ const PlayerPane: React.FC<{ timeline: Timeline; stale: boolean }> = ({ timeline
 
 interface FilmSegment { id: string; beat: number; startPhase: number; endPhase: number }
 
-/** ribbon blocks tile the loop: each glyph formation runs until the next one starts; trace beats laid end to end */
+/** ribbon blocks tile the loop: each glyph formation runs until the next one starts; trace acts laid end to end */
 function filmSegments(timeline: Timeline): FilmSegment[] {
   if (timeline.style === 'glyph') {
     const f = timeline.formations
     return f.map((x, i) => ({ id: x.id, beat: x.beat, startPhase: i === 0 ? 0 : x.startPhase, endPhase: f[i + 1]?.startPhase ?? 1 }))
   }
-  const b = timeline.scene.beats
-  const cuts: Array<[string, number]> = [['build', 0], ['growth', b.growth[0]], ['finish', b.growth[1]], ['hold', b.hold[0]], ['fade', b.fade[0]]]
+  const a = TRACE_ACTS
+  const cuts: Array<[string, number]> = [['drawing', 0], ['mask', a.mask[0]], ['parts', a.place[0]], ['reflow', a.reflow[0]], ['breath', a.reflow[1]], ['power', a.power[0]], ['hold', a.hold[0]]]
   return cuts.map(([id, start], i) => ({ id, beat: i, startPhase: start, endPhase: cuts[i + 1]?.[1] ?? 1 }))
 }
 
@@ -591,13 +614,18 @@ interface Look {
   palette: PaletteId | undefined
   accent: string | undefined
   title: { name: string; version: string }
+  hero: string | undefined
+  mask: MaskColor | undefined
 }
 
-const DEFAULT_LOOK: Look = { style: 'trace', aspect: '4:5', palette: undefined, accent: undefined, title: { name: '', version: '' } }
+const DEFAULT_LOOK: Look = { style: 'trace', aspect: '4:5', palette: undefined, accent: undefined, title: { name: '', version: '' }, hero: undefined, mask: undefined }
 
 const ASPECT_BOX: Record<Aspect, [number, number]> = { '4:5': [12, 15], '1:1': [14, 14], '9:16': [9, 16], '16:9': [16, 9] }
 
-const LookPanel: React.FC<{ look: Look; onLook: (patch: Partial<Look>) => void; disabled: boolean }> = ({ look, onLook, disabled }) => {
+const LookPanel: React.FC<{ look: Look; onLook: (patch: Partial<Look>) => void; disabled: boolean; board: BoardModel }> = ({ look, onLook, disabled, board }) => {
+  const heroes = useMemo(() => heroChoices(board), [board])
+  const autoHero = useMemo(() => heroPart(board, undefined, castHints(board)), [board])
+  const boardMask = board.stackup.maskColor?.toLowerCase()
   const defaultPalette = look.style === 'glyph' ? 'mono' : 'copper'
   const activePalette = look.palette ?? defaultPalette
   const activeHead = PALETTE_LIST.find((p) => p.id === activePalette)?.head ?? '#ffffff'
@@ -646,15 +674,16 @@ const LookPanel: React.FC<{ look: Look; onLook: (patch: Partial<Look>) => void; 
             key={pal.id}
             role="radio"
             aria-checked={activePalette === pal.id}
-            aria-label={pal.id}
             title={pal.id}
             className={activePalette === pal.id ? 'swatch swatch-on' : 'swatch'}
-            style={{ background: `linear-gradient(90deg, ${pal.bg} 0 34%, ${pal.copper} 34% 67%, ${pal.head} 67%)` }}
             disabled={disabled}
             onClick={() => {
               onLook({ palette: pal.id === defaultPalette ? undefined : pal.id as PaletteId })
             }}
-          />
+          >
+            <span className="swatch-chip" style={{ background: `linear-gradient(90deg, ${pal.bg} 0 34%, ${pal.copper} 34% 67%, ${pal.head} 67%)` }} />
+            <span className="swatch-name">{pal.id}</span>
+          </button>
         ))}
         <label className="accent-field" title="accent colour (growth heads, hero)">
           <input
@@ -672,6 +701,36 @@ const LookPanel: React.FC<{ look: Look; onLook: (patch: Partial<Look>) => void; 
             }}>✕</button>
           )}
         </label>
+      </div>
+      <div className="pick-fields">
+        <label className="field">
+          <span>hero part</span>
+          <select
+            value={look.hero ?? ''}
+            disabled={disabled}
+            onChange={(e) => {
+              onLook({ hero: e.target.value === '' ? undefined : e.target.value })
+            }}
+          >
+            <option value="">{`Automatic${autoHero ? ` (${autoHero.ref}${autoHero.value ? ` · ${autoHero.value}` : ''})` : ''}`}</option>
+            {heroes.filter((f) => f.ref !== autoHero?.ref).map((f) => <option key={f.ref} value={f.ref}>{f.value ? `${f.ref} · ${f.value}` : f.ref}</option>)}
+          </select>
+        </label>
+        {look.style === 'trace' && (
+          <label className="field">
+            <span>solder mask</span>
+            <select
+              value={look.mask ?? ''}
+              disabled={disabled}
+              onChange={(e) => {
+                onLook({ mask: e.target.value === '' ? undefined : e.target.value as MaskColor })
+              }}
+            >
+              <option value="">{boardMask !== undefined ? `From the board file (${boardMask})` : 'From the board file (none set, so green)'}</option>
+              {MASK_COLORS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       <div className="title-fields">
         <input
@@ -705,8 +764,8 @@ const KnobPanel: React.FC<{
   style: StyleId
   knobs: StudioKnobs
   onKnobs: (patch: Partial<StudioKnobs>) => void
-  seed: number | null
-  onSeed: (seed: number | null) => void
+  seed: number
+  onSeed: (seed: number) => void
   duration: 'auto' | number
   onDuration: (duration: 'auto' | number) => void
   disabled: boolean
@@ -754,35 +813,23 @@ const KnobPanel: React.FC<{
             <input
               id="knob-seed"
               type="number"
-              value={seed ?? ''}
-              placeholder="random each render"
+              min={0}
+              value={seed}
               disabled={disabled}
               onChange={(e) => {
-                const raw = e.target.value
-                onSeed(raw === '' ? null : Math.floor(Number(raw)))
+                const next = Math.floor(Number(e.target.value))
+                if (Number.isFinite(next) && next >= 0) onSeed(next)
               }}
             />
             <button
               className="ghost"
-              aria-label="randomize seed"
-              title="randomize seed"
+              title="pick a random seed"
               disabled={disabled}
               onClick={() => {
                 onSeed(Math.floor(Math.random() * 1_000_000))
               }}
             >
-              ⟳
-            </button>
-            <button
-              className="ghost"
-              aria-label="clear seed"
-              title="clear seed"
-              disabled={disabled}
-              onClick={() => {
-                onSeed(null)
-              }}
-            >
-              ✕
+              random
             </button>
           </div>
         </div>
@@ -803,9 +850,11 @@ const KnobPanel: React.FC<{
                 onDuration(raw === '' ? 'auto' : Number(raw))
               }}
             />
-            <button className="ghost" disabled={disabled} onClick={() => {
-              onDuration('auto')
-            }}>auto</button>
+            {duration !== 'auto' && (
+              <button className="ghost" aria-label="reset duration to automatic" title="reset to automatic" disabled={disabled} onClick={() => {
+                onDuration('auto')
+              }}>✕</button>
+            )}
           </div>
         </div>
       </div>
@@ -829,7 +878,7 @@ const ExportControl: React.FC<{ state: ExportState | null; onExport: () => Promi
       )}
       {state?.status === 'rendering' && (
         <>
-          <span className="export-status" role="status">rendering {state.job.progress > 0 ? `${state.job.progress}%` : '…'}</span>
+          <span className="export-status" role="status">rendering {state.job.progress > 0 ? `${state.job.progress}%` : '…'}{state.job.etaSeconds !== null ? ` · about ${state.job.etaSeconds} s left` : ''}</span>
           <button className="ghost" onClick={onCancel}>cancel</button>
         </>
       )}
@@ -854,11 +903,6 @@ const ExportControl: React.FC<{ state: ExportState | null; onExport: () => Promi
       )}
       {state?.status === 'completed' && (
         <>
-          {state.job.gatePassed !== null && (
-            <span className={`gate-chip ${state.job.gatePassed ? 'gate-ok' : 'gate-warn'}`} title={state.job.gateDetail ?? ''}>
-              {`gate ${state.job.gatePassed ? 'pass' : 'advisory'}`}
-            </span>
-          )}
           <a className="button-link" href={downloadUrl(state.job.jobId)}>download</a>
           <button className="ghost" disabled={disabled} onClick={() => {
             void onExport()

@@ -17,7 +17,7 @@ gsap.registerPlugin(ScrollTrigger)
 
 const $ = (s: string, r: ParentNode = document) => r.querySelector<HTMLElement>(s)
 const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document): T[] => [...r.querySelectorAll<T>(s)]
-const stacked = () => matchMedia('(max-width: 900px)').matches
+const stacked = () => matchMedia('(max-width: 1100px)').matches
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
 const pad = (v: number, n = 2) => String(Math.floor(v)).padStart(n, '0')
 const tc = (frame: number) => `${pad(frame / 30 / 60)}:${pad((frame / 30) % 60)}.${pad(((frame / 30) % 1) * 100)}`
@@ -29,7 +29,9 @@ const GROUND = '#ecede9'
 function heroPose(): Omit<ReelPose, 'ex'> {
   if (stacked()) {
     const say = document.querySelector<HTMLElement>('.hero__say')
-    return { k: 0.45, cx: -84, ly: Math.max(356, say ? say.offsetTop + say.offsetHeight + 120 : 0), leader: innerWidth + 200 }
+    // a tablet held wide keeps the coil large enough to fill the width under the words
+    const k = clamp(innerWidth / 1600, 0.45, 0.68)
+    return { k, cx: -84, ly: Math.max(356, say ? say.offsetTop + say.offsetHeight + 80 + 40 * k : 0), leader: innerWidth + 200 }
   }
   const k = clamp(innerWidth / 1440, 0.6, 1.3)
   return { k, cx: innerWidth * 0.05, ly: 78 + 91 * k, leader: innerWidth * 1.1 }
@@ -346,6 +348,11 @@ export function setupHome() {
     look.setPalette(ROOM, { instant: true })
     look.setView({ zoom: 1920 / 1092, fx: 0.5, fy: 0.5, cx: 0.5, cy: 0.5 }, { instant: true })
     void fixtureFilm('glasgow', '16:9').then((film) => { look.show(film, { decode: false }); if (reduced) look.scrub(182); else look.seek(182) })
+    // the drawing hands over to this film on its plan act, the beat where its parts sit on the board's own outline
+    const PLAN = (5 / 24) * FRAMES
+    lookCanvas.addEventListener('handover', (e) => {
+      if ((e as CustomEvent<boolean>).detail) { look.seek(PLAN); look.play() } else { look.pause(); look.seek(PLAN) }
+    })
     // each film's steps run under its frame: the playhead marks the beat, a click plays on from a step
     const traceActs = $('[data-look="trace"] [data-acts]') ?? undefined
     const glyphActs = $('[data-look="glyph"] [data-acts]') ?? undefined

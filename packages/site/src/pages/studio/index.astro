@@ -104,6 +104,12 @@ const looks = [
             <label class="st__field st__field--seed"><span>Seed</span><input type="number" name="seed" value="42" min="0" max="99999" inputmode="numeric" /></label>
             <button type="button" class="st__dice" data-dice aria-label="New random seed"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /><circle cx="5.5" cy="5.5" r="1" /><circle cx="10.5" cy="10.5" r="1" /><circle cx="8" cy="8" r="1" /></svg></button>
           </div>
+          <label class="st__field"><span>Hero part</span><select name="hero"><option value="">Automatic</option></select></label>
+          <label class="st__field" data-only="trace"><span>Solder mask</span><select name="mask">
+            <option value="">From the board file</option>
+            <option value="green">Green</option><option value="black">Black</option><option value="white">White</option>
+            <option value="blue">Blue</option><option value="red">Red</option><option value="yellow">Yellow</option><option value="purple">Purple</option>
+          </select></label>
           <div class="st__row">
             <label class="st__field st__field--accent"><span>Accent</span><input type="color" name="accent" value="#ff4a3d" /></label>
             <span class="mono st__accent-v" data-accent-v>Default</span>
@@ -128,7 +134,7 @@ const looks = [
         </div>
         <ol class="st__jobs" data-jobs aria-live="polite"></ol>
         <div class="st__setup" data-setup>
-          <p class="st__note">This tab plays the film and records WebM. MP4, GIF, ProRes, the full trace film with its sound, and trace for your own board render on your machine. Set it up once:</p>
+          <p class="st__note">This tab plays a draft of the film and records WebM. MP4, GIF, ProRes and the full trace film with its sound render on your machine. Set it up once:</p>
           <div class="st__chips" role="radiogroup" aria-label="Setup">
             <label class="st__chip"><input type="radio" name="setup" value="cmd" checked /><span>Commands</span></label>
             <label class="st__chip"><input type="radio" name="setup" value="agent" /><span>Agent prompt</span></label>

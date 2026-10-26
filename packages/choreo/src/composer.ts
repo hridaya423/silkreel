@@ -227,7 +227,7 @@ export function composeFilm(
   const at = (b: number): number => Math.round((b * steps) / LOOP_BEATS)
 
   // every act is the board: its hero's routes, its plan, the hero's neighbourhood
-  const hero = heroPart(board)
+  const hero = heroPart(board, resolved.hero, resolved.cast)
   const coreRoom = { x: Math.min(room.nx - 3, 5), y: Math.min(room.ny - 3, 6) }
   const core = boardCore(board, hero, coreRoom.x, coreRoom.y)
   const heroPkg = (hero === undefined ? undefined : heroChip(board, hero.ref)) ??

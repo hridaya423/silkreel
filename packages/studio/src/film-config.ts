@@ -1,10 +1,14 @@
 import { ASPECT_SIZE, compileTimeline, DEMO_CAST_HINTS, PALETTES } from '@silk-reel/choreo'
-import type { Aspect, FilmConfig, Knobs, Palette, PaletteId, StyleId } from '@silk-reel/choreo'
+import type { Aspect, CastHints, FilmConfig, Knobs, MaskColor, Palette, PaletteId, StyleId } from '@silk-reel/choreo'
 import type { BoardModel } from '@silk-reel/ingest'
+
+export function castHints(board: BoardModel): CastHints | undefined {
+  return DEMO_CAST_HINTS[board.source.boardName]
+}
 
 /** fixture boards pick up the same curated cast hints the CLI and render-api use */
 export function compileStudioFilm(board: BoardModel, config: FilmConfig) {
-  const cast = config.cast ?? DEMO_CAST_HINTS[board.source.boardName]
+  const cast = config.cast ?? castHints(board)
   const resolved: FilmConfig = { ...config, ...(cast !== undefined ? { cast } : {}) }
   const timeline = compileTimeline(board, resolved)
   return {
@@ -51,7 +55,9 @@ export interface StudioState {
   accent: string | undefined
   title: { name: string; version: string }
   knobs: StudioKnobs
-  seed: number | null
+  hero: string | undefined
+  mask: MaskColor | undefined
+  seed: number
   duration: 'auto' | number
 }
 
@@ -75,6 +81,8 @@ export function studioFilmConfig(s: StudioState): FilmConfig {
     output: { ...ASPECT_SIZE[s.aspect], fps: STUDIO_FPS },
     ...(s.palette !== undefined ? { palette: s.palette } : {}),
     ...(s.accent !== undefined ? { accent: s.accent } : {}),
+    ...(s.hero !== undefined ? { hero: s.hero } : {}),
+    ...(s.mask !== undefined && s.style === 'trace' ? { mask: s.mask } : {}),
     ...(name !== '' ? { title: { name, ...(version !== '' ? { version } : {}) } } : {})
   }
 }

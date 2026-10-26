@@ -47,13 +47,13 @@ describe('drawTraceFrame', () => {
     expect(callsOf('stroke').length).toBeGreaterThan(0)
   })
 
-  it('dims everything below 0.3 alpha during the final fade', () => {
+  it('ends on the held board, drawn at full strength', () => {
     const timeline = traceTimeline('glasgow.kicad_pcb')
     const rec = currentRecorder()
-    drawTraceFrame(asCtx(rec), timeline, Math.floor(timeline.totalFrames * 0.995))
+    const drawn = drawTraceFrame(asCtx(rec), timeline, timeline.totalFrames - 1)
+    expect(drawn).toBeGreaterThan(0)
     const alphas = rec.calls.filter((c) => c.method === 'set:globalAlpha').map((c) => c.args[0] as number)
-    expect(alphas.length).toBeGreaterThan(0)
-    for (const a of alphas) expect(a).toBeLessThan(0.3)
+    expect(Math.max(...alphas)).toBe(1)
   })
 
   it('fades the drill constellation in during the outline beat', () => {

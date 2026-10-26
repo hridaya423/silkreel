@@ -34,15 +34,17 @@ npm ci
 npm run reel -- fixtures/boards/glasgow.kicad_pcb --style trace --aspect 16:9 -o glasgow.mp4
 ```
 
-You need Node.js 22 or later, and `ffmpeg` and `ffprobe` on your PATH. The first render downloads its own copy of Chromium.
+You need Node.js 22 or later, and `ffmpeg` and `ffprobe` on your PATH. The first render downloads a headless Chrome of about 90 MB, once.
 
-To film your own board, give the CLI its file:
+To film your own board, give the CLI its file. silk reel reads `.kicad_pcb` files from KiCad 4 or later; it does not read Gerber, Eagle or Altium files.
 
 ```bash
-npm run reel -- path/to/your-board.kicad_pcb --style glyph --aspect 9:16 --title "Your Board" --version v1.0
+npm run reel -- path/to/your-board.kicad_pcb --aspect 9:16 --title "Your Board" --version v1.0
 ```
 
-A glyph film renders in about ten seconds. A trace film takes one to two minutes on a GPU; `--draft` takes a fraction of that. On a machine without a GPU, put `SILK_REEL_GL=swangle` in front of the command.
+A trace film takes about 30 seconds on an Apple M4 Pro and comes out near 8 MB. It also writes `<name>.poster.png`, the last frame, for a cover image. A glyph film renders in about ten seconds, and `--draft` takes a fraction of the time. On a machine without a GPU, put `SILK_REEL_GL=swangle` in front of the command. Run `npm run reel -- --help` to list every flag.
+
+The film is about one part, the hero. silk reel picks the IC with the most pads, then any other part with eight or more pads, then the connector with the most pads. Name a different part with `--hero U3`.
 
 ## Options
 
@@ -52,6 +54,8 @@ A glyph film renders in about ten seconds. A trace film takes one to two minutes
 | `--aspect` | `4:5` 1080×1350 · `1:1` 1080×1080 · `9:16` 1080×1920 · `16:9` 1920×1080 | `4:5` |
 | `--palette` | `copper` · `mono` · `blueprint` · `phosphor` | `copper` (trace), `mono` (glyph) |
 | `--accent` | `#rrggbb` for the hero highlight | the palette's |
+| `--hero` | the reference of the part the film is about, e.g. `U3` | the IC with the most pads |
+| `--mask` | `green` · `black` · `white` · `blue` · `red` · `yellow` · `purple` (trace) | the board file's, else `green` |
 | `--title` | the board's name on a title card; leave it out for no card | none |
 | `--version` | a version under the title; needs `--title` | none |
 | `--format` | `mp4` · `gif` (720 px wide at most) · `webm-alpha` · `prores-alpha` (4444) | `mp4` |
@@ -60,12 +64,13 @@ A glyph film renders in about ten seconds. A trace film takes one to two minutes
 | `--draft` | fast preview quality | off |
 | `--no-audio` | leave the score out of a trace film | off |
 | `-o` | output path | `<board>-<style>-<aspect>.<ext>` beside the input |
+| `-h`, `--help` | list every flag | |
 
 The alpha formats have a transparent background, so you can put the film over your own footage. The same board and flags always render the same film.
 
 ## Studio
 
-The [website](packages/site) has a studio that runs in the browser. It plays both looks for the sample boards and plays your own board as glyph. Your board is read in the tab and never uploaded. It records WebM, saves stills, and writes the command for everything else.
+The [website](packages/site) has a studio that runs in the browser. It plays a draft of both looks, for the sample boards and for your own board. Your board is read in the tab and never uploaded. It records WebM, saves stills, and writes the command for everything else.
 
 Run the full studio on your machine to render every format from a queue:
 

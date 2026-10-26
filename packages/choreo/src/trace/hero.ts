@@ -1,4 +1,5 @@
 import type { BoardModel, Vec2 } from '@silk-reel/ingest'
+import { heroPart } from '../acts'
 import type { CastHints } from '../types'
 
 export interface HeroPick {
@@ -10,26 +11,9 @@ export interface HeroPick {
   pads: Array<{ layer: string; pos: Vec2 }>
 }
 
-export function pickHero(board: BoardModel, hints?: CastHints): HeroPick | undefined {
+export function pickHero(board: BoardModel, hints?: CastHints, ref?: string): HeroPick | undefined {
   if (board.footprints.length === 0) return undefined
-  let fp = hints?.preferRefs
-    ?.map((ref) => board.footprints.find((f) => f.ref === ref && ref.startsWith('U')))
-    .find((f) => f !== undefined)
-  if (fp === undefined) {
-    const cx = (board.bbox.min.x + board.bbox.max.x) / 2
-    const cy = (board.bbox.min.y + board.bbox.max.y) / 2
-    let best = -1
-    let bestD = Infinity
-    board.footprints.forEach((f) => {
-      const n = f.padRefs.length
-      const d = Math.hypot(f.pos.x - cx, f.pos.y - cy)
-      if (n > best || (n === best && d < bestD)) {
-        best = n
-        bestD = d
-        fp = f
-      }
-    })
-  }
+  const fp = heroPart(board, ref, hints)
   if (fp === undefined) return undefined
   const hero = fp
   const pads: HeroPick['pads'] = []

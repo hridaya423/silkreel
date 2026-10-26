@@ -1,7 +1,7 @@
 import type { BoardModel, Footprint, Vec2 } from '@silk-reel/ingest'
 import type { CellKind } from './cells'
 import { classify, CLASS_CELL } from './cells'
-import type { FormationId, Glyph } from './types'
+import type { CastHints, FormationId, Glyph } from './types'
 
 /**
  * Three acts, each a structure with a direction of growth. Cells sit on an
@@ -502,15 +502,46 @@ const PRIORITY: Record<CellKind, number> = {
   dot: 0, tick: 0, dash: 0, slash: 0, wedge: 0, corner: 0
 }
 
-/** the board's biggest IC by pad count, else its biggest part */
-export function heroPart(board: BoardModel): Footprint | undefined {
-  const pads = padCounts(board)
+/**
+ * The named part if the board has it, then the first IC the curated hints
+ * prefer. Otherwise the biggest IC by pad count,
+ * then the biggest part that is not a connector or a hole, then a connector;
+ * a tie goes to the part nearer the board's centre.
+ */
+/** the parts worth offering as a hero, best first: ICs, then big parts, then big connectors */
+export function heroChoices(board: BoardModel, limit = 16): Footprint[] {
+  const rank = (f: Footprint): number => {
+    const k = classify(f.ref, f.value)
+    return k === 'ic' ? 0 : k === 'conn' ? 2 : 1
+  }
+  return board.footprints
+    .filter((f) => !/\*/.test(f.ref) && !['hole', 'tp'].includes(classify(f.ref, f.value)) && (rank(f) === 0 || f.padRefs.length >= 8))
+    .sort((a, b) => rank(a) - rank(b) || b.padRefs.length - a.padRefs.length || a.ref.localeCompare(b.ref, undefined, { numeric: true }))
+    .slice(0, limit)
+}
+
+export function heroPart(board: BoardModel, ref?: string, hints?: CastHints): Footprint | undefined {
+  const named = ref === undefined ? undefined : board.footprints.find((f) => f.ref === ref)
+  if (named !== undefined) return named
+  const hinted = hints?.preferRefs
+    ?.map((r) => board.footprints.find((f) => f.ref === r && r.startsWith('U')))
+    .find((f) => f !== undefined)
+  if (hinted !== undefined) return hinted
   const real = board.footprints.filter((f) => !/\*/.test(f.ref))
-  const ics = real.filter((f) => classify(f.ref, f.value) === 'ic')
-  return (ics.length > 0 ? ics : real).reduce<Footprint | undefined>(
-    (best, f) => (best === undefined || (pads.get(f.ref) ?? 0) > (pads.get(best.ref) ?? 0) ? f : best),
-    undefined
-  )
+  const kind = (f: Footprint): string => classify(f.ref, f.value)
+  const ics = real.filter((f) => kind(f) === 'ic')
+  const parts = real.filter((f) => !['conn', 'hole', 'tp'].includes(kind(f)) && f.padRefs.length >= 8)
+  const conns = real.filter((f) => kind(f) === 'conn')
+  const pool = [ics, parts, conns, real].find((list) => list.length > 0) ?? []
+  const cx = (board.bbox.min.x + board.bbox.max.x) / 2
+  const cy = (board.bbox.min.y + board.bbox.max.y) / 2
+  const off = (f: Footprint): number => Math.hypot(f.pos.x - cx, f.pos.y - cy)
+  return pool.reduce<Footprint | undefined>((best, f) => {
+    if (best === undefined) return f
+    const n = f.padRefs.length
+    const m = best.padRefs.length
+    return n > m || (n === m && off(f) < off(best)) ? f : best
+  }, undefined)
 }
 
 /**

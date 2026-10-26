@@ -44,7 +44,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "eslint": "^9.35.0",
-    "happy-dom": "^20.11.6",
+    "happy-dom": "^21.0.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",

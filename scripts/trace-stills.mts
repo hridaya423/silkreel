@@ -1,13 +1,14 @@
 // trace look-loop: stills of the lit trace renderer at chosen phases, one sheet per board
-// usage: npx tsx scripts/trace-stills.mts glasgow,icebreaker 4:5 0.05,0.3,0.62,0.9 [out]
+// usage: npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { bundle } from '@remotion/bundler'
 import { renderStill, selectComposition } from '@remotion/renderer'
 import type { OpenGlRenderer } from '@remotion/renderer'
 import { ASPECT_SIZE, compileTimeline } from '../packages/choreo/src/index.ts'
 import type { Aspect, FilmConfig } from '../packages/choreo/src/index.ts'
+import { parseKicadPcb } from '../packages/ingest/src/index.ts'
 import { loadDemoBoard, defaultFilmConfig } from '../packages/render-api/src/boards.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -17,10 +18,12 @@ mkdirSync(out, { recursive: true })
 const chromiumOptions = { gl: (process.env.SILK_REEL_GL ?? 'angle') as OpenGlRenderer }
 const serveUrl = await bundle({ entryPoint: path.join(root, 'packages/render/src/remotion-entry.tsx'), onProgress: () => undefined })
 try {
-  for (const board of boardsArg.split(',')) {
+  for (const arg of boardsArg.split(',')) {
+    const own = arg.endsWith('.kicad_pcb')
+    const board = own ? path.basename(arg, '.kicad_pcb') : arg
     const size = ASPECT_SIZE[aspect as Aspect]
     const config = { ...defaultFilmConfig(board), style: 'trace', aspect, output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
-    const timeline = compileTimeline(await loadDemoBoard(board), config)
+    const timeline = compileTimeline(own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board), config)
     const inputProps = { timeline }
     const composition = await selectComposition({ serveUrl, id: 'film', inputProps })
     const files: string[] = []

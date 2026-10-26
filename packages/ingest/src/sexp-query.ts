@@ -45,13 +45,13 @@ export function atomsAfterHead(node: SExprNode[]): string[] {
 export function toNumber(atom: string, contextFile: string, what: string): number {
   const value = Number.parseFloat(atom)
   if (!Number.isFinite(value)) {
-    throw new ParseError(contextFile, `${what} is not a finite number: "${atom}"`)
+    throw new ParseError(contextFile, `${what} is "${atom}", not a number. Please report this file at https://github.com/hridaya423/silkreel/issues`)
   }
   return value
 }
 
 export function parseXY(node: SExprNode[], file: string): { x: number; y: number } {
   const atoms = atomsAfterHead(node)
-  if (atoms.length < 2) throw new ParseError(file, 'xy node needs two coordinates')
+  if (atoms.length < 2) throw new ParseError(file, 'a point has only one coordinate, so the file is damaged')
   return { x: toNumber(atoms[0] as string, file, 'xy coordinate'), y: toNumber(atoms[1] as string, file, 'xy coordinate') }
 }

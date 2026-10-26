@@ -1,6 +1,6 @@
 import { gsap } from 'gsap'
 import { ASPECT_SIZE, DEMO_CAST_HINTS } from '@silk-reel/choreo'
-import type { Aspect, FilmConfig, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
+import type { Aspect, FilmConfig, MaskColor, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
 import { createPreview } from '@silk-reel/render/preview'
 import { prefersReducedMotion } from '../engine/env'
 import { aspects, boards, formats, site } from '../data/site'
@@ -11,9 +11,11 @@ type Format = 'mp4' | 'gif' | 'webm-alpha' | 'prores-alpha'
 interface State {
   board: string; style: StyleId; aspect: Aspect; palette: PaletteId; accent: string; useAccent: boolean
   title: string; version: string; tempo: number; seed: number; format: Format
+  /** '' lets the film pick */
+  hero: string; mask: MaskColor | ''
 }
 interface Own { id: string; file: string; name: string }
-interface Job { id: string; status: string; progress: number; format: string; error?: string }
+interface Job { id: string; status: string; progress: number; format: string; error?: string; etaSeconds?: number | null }
 
 /** the live monitor compiles at two thirds of the release size: the same layout, a lighter frame */
 const PREVIEW = 2 / 3
@@ -26,7 +28,7 @@ const even = (v: number) => Math.round(v / 2) * 2
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const why = (e: unknown) => {
   const t = (e instanceof Error ? e.message : String(e)).trim().replace(/\s+/g, ' ')
-  return t.length > 90 ? `${t.slice(0, 90)}…` : t
+  return t.length > 240 ? `${t.slice(0, 240)}…` : t
 }
 
 export function setupStudio() {
@@ -58,14 +60,14 @@ export function setupStudio() {
     version: (q.get('version') ?? '').slice(0, 12),
     tempo: Math.min(1.5, Math.max(0.75, Number(q.get('tempo') ?? 1) || 1)),
     seed: Number.isInteger(Number(q.get('seed'))) && q.get('seed') !== null ? Number(q.get('seed')) : 42,
-    format: (['mp4', 'gif', 'webm-alpha', 'prores-alpha'] as const).find((f) => f === q.get('format')) ?? 'mp4'
+    format: (['mp4', 'gif', 'webm-alpha', 'prores-alpha'] as const).find((f) => f === q.get('format')) ?? 'mp4',
+    hero: (q.get('hero') ?? '').slice(0, 64),
+    mask: (['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple'] as const).find((c) => c === q.get('mask')) ?? ''
   }
   /** the board the visitor dropped; it stays selectable after they try a sample */
   let own: Own | null = null
   const isOwn = () => own?.id === state.board
   const boardName = () => (isOwn() ? own?.name : boards.find((b) => b.id === state.board)?.name) ?? state.board
-  /** a dropped board plays as glyph in the tab; the trace look renders from the command line */
-  const liveStyle = (): StyleId => (isOwn() ? 'glyph' : state.style)
 
   const field = <T extends HTMLInputElement>(name: string) => [...root.querySelectorAll<T>(`[name="${name}"]`)]
   const writeForm = () => {
@@ -73,6 +75,7 @@ export function setupStudio() {
     const set = (name: string, v: string) => { const el = field(name)[0]; if (el) el.value = v }
     set('title', state.title); set('version', state.version); set('accent', state.accent)
     set('tempo', String(state.tempo)); set('seed', String(state.seed))
+    set('hero', state.hero); set('mask', state.mask)
   }
   const readForm = () => {
     const pick = (name: string) => field(name).find((el) => el.checked)?.value
@@ -84,11 +87,13 @@ export function setupStudio() {
     state.title = val('title').trim(); state.version = val('version').trim()
     state.accent = val('accent')
     state.tempo = Number(val('tempo')) || 1
+    state.hero = val('hero')
+    state.mask = val('mask') as MaskColor | ''
     const seed = Number(val('seed'))
     state.seed = Number.isFinite(seed) ? Math.max(0, Math.min(99999, Math.round(seed))) : 42
   }
 
-  const config = (scale: number, style: StyleId = liveStyle()): FilmConfig => {
+  const config = (scale: number, style: StyleId = state.style): FilmConfig => {
     const size = ASPECT_SIZE[state.aspect]
     const cast = DEMO_CAST_HINTS[state.board]
     return {
@@ -98,6 +103,8 @@ export function setupStudio() {
       ...(cast !== undefined ? { cast } : {}),
       ...(state.style === 'glyph' ? { palette: state.palette } : {}),
       ...(state.useAccent ? { accent: state.accent } : {}),
+      ...(state.hero ? { hero: state.hero } : {}),
+      ...(style === 'trace' && state.mask ? { mask: state.mask } : {}),
       ...(state.title ? { title: { name: state.title, ...(state.version ? { version: state.version } : {}) } } : {})
     }
   }
@@ -110,6 +117,8 @@ export function setupStudio() {
     const parts = ['npm run reel --', quote(file), '--style', state.style, '--aspect', state.aspect]
     if (state.style === 'glyph') parts.push('--palette', state.palette)
     if (state.useAccent) parts.push('--accent', state.accent)
+    if (state.hero) parts.push('--hero', quote(state.hero))
+    if (state.style === 'trace' && state.mask) parts.push('--mask', state.mask)
     if (state.title) parts.push('--title', quote(state.title))
     if (state.title && state.version) parts.push('--version', quote(state.version))
     if (state.seed !== 42) parts.push('--seed', String(state.seed))
@@ -333,8 +342,9 @@ export function setupStudio() {
     setMode('ready')
     if (same) return
     state.board = id
+    state.hero = ''
     ready = `${boardName()} is ready.`
-    paintControls(); recompile(true)
+    paintControls(); paintParts(); recompile(true)
   }
   sampleSel?.addEventListener('change', () => { if (sampleSel.value) pickBoard(sampleSel.value) })
 
@@ -343,7 +353,6 @@ export function setupStudio() {
     if (!file) return
     if (!/\.kicad_pcb$/i.test(file.name)) { fail('That is not a .kicad_pcb file. Save the board from KiCad and drop that file.'); return }
     const id = `own-${String(Date.now())}`
-    const before = mode
     clearFail(); setMode('ready'); showBusy(true, 'Reading your board…'); say('Reading your board.')
     void load(id, file.text(), file.name.replace(/\.kicad_pcb$/i, '')).then((stats) => {
       own = { id, file: file.name, name: stats.name }
@@ -352,12 +361,13 @@ export function setupStudio() {
       opt.dataset.own = ''
       sampleSel?.options[0]?.after(opt)
       state.board = id
+      state.hero = ''
       ready = `${stats.name} is ready.`
-      paintControls(); recompile(true)
+      paintControls(); paintParts(); recompile(true)
     }, (err: unknown) => {
-      showBusy(false); setMode(before)
+      showBusy(false); setMode('empty')
       const detail = why(err)
-      fail(`Could not read ${file.name}${detail ? ` (${detail})` : ''}. Save the board from KiCad again and drop the new file.`)
+      fail(detail || `Could not read ${file.name}.`)
     })
   }
   for (const b of root.querySelectorAll('[data-pick]')) b.addEventListener('click', () => { fileInput?.click() })
@@ -374,6 +384,25 @@ export function setupStudio() {
   const paletteName = $('[data-palette-name]', root)
   const aspectUse = $('[data-aspect-use]', root)
   const titleIn = root.querySelector<HTMLInputElement>('[data-title]')
+  /** the hero and mask pickers name this board's own parts and colour */
+  const heroSel = root.querySelector<HTMLSelectElement>('[name="hero"]')
+  const maskSel = root.querySelector<HTMLSelectElement>('[name="mask"]')
+  const paintParts = () => {
+    const id = state.board
+    void load(id).then((stats) => {
+      if (id !== state.board) return
+      const label = (h: { ref: string; value: string }) => (h.value ? `${h.ref} · ${h.value}` : h.ref)
+      const auto = stats.heroes.find((h) => h.ref === stats.autoHero)
+      heroSel?.replaceChildren(
+        new Option(`Automatic${auto ? ` (${label(auto)})` : ''}`, ''),
+        ...stats.heroes.map((h) => new Option(label(h), h.ref))
+      )
+      if (heroSel) heroSel.value = stats.heroes.some((h) => h.ref === state.hero) ? state.hero : ''
+      const first = maskSel?.options[0]
+      if (first) first.text = `From the board file (${stats.mask ? stats.mask.toLowerCase() : 'none set, so green'})`
+    }, () => undefined)
+  }
+
   const paintControls = () => {
     for (const el of root.querySelectorAll<HTMLElement>('[data-only]')) el.hidden = el.dataset.only !== state.style
     for (const o of outs) o.textContent = `${state.tempo.toFixed(2)}×`
@@ -381,7 +410,7 @@ export function setupStudio() {
     if (accentReset) accentReset.hidden = !state.useAccent
     if (liveNote) {
       liveNote.hidden = state.style !== 'trace'
-      liveNote.textContent = isOwn() ? 'Your board plays as glyph here. Trace renders on your machine.' : 'A draft preview. The full trace film, with its sound, renders on your machine.'
+      liveNote.textContent = 'A draft preview. The full trace film, with its sound, renders on your machine.'
     }
     if (paletteName) paletteName.textContent = cap(state.palette)
     if (aspectUse) aspectUse.textContent = aspects.find((a) => a.id === state.aspect)?.use ?? ''
@@ -407,6 +436,8 @@ export function setupStudio() {
     if (state.seed !== 42) p.set('seed', String(state.seed))
     if (state.tempo !== 1) p.set('tempo', String(state.tempo))
     if (state.format !== 'mp4') p.set('format', state.format)
+    if (state.hero) p.set('hero', state.hero)
+    if (state.mask) p.set('mask', state.mask)
     history.replaceState(history.state, '', u)
   }
 
@@ -438,7 +469,7 @@ export function setupStudio() {
     a.click()
     setTimeout(() => { URL.revokeObjectURL(a.href) }, 4000)
   }
-  const fileBase = () => `${boardName().replace(/[^\w.-]+/g, '-')}-${liveStyle()}-${state.aspect.replace(':', 'x')}`
+  const fileBase = () => `${boardName().replace(/[^\w.-]+/g, '-')}-${state.style}-${state.aspect.replace(':', 'x')}`
 
   stillBtn?.addEventListener('click', () => {
     if (!tl) return
@@ -524,7 +555,7 @@ export function setupStudio() {
     jobsEl.replaceChildren(...[...jobs.values()].reverse().map((j) => {
       const el = (tag: string, cls: string, text: string) => Object.assign(document.createElement(tag), { className: cls, textContent: text })
       const li = el('li', `st__job is-${j.status}`, '')
-      li.style.setProperty('--p', String(j.progress))
+      li.style.setProperty('--p', String(j.progress / 100))
       li.append(el('span', 'st__job-n', j.label))
       if (j.status === 'done') {
         const a = el('a', 'st__job-dl', `Download ${fmtName(j.format)}`) as HTMLAnchorElement
@@ -533,7 +564,8 @@ export function setupStudio() {
       } else if (j.status === 'pending' || j.status === 'rendering') {
         const x = el('button', 'st__job-x', 'Cancel')
         x.dataset.cancel = j.id
-        li.append(x, el('span', 'st__job-p', `${j.status === 'pending' ? 'Queued' : 'Rendering'} · ${String(Math.round(j.progress * 100))}%`))
+        const eta = j.etaSeconds != null ? ` · about ${String(j.etaSeconds)} s left` : ''
+        li.append(x, el('span', 'st__job-p', j.status === 'pending' ? 'Queued' : `Rendering · ${String(Math.round(j.progress))}%${eta}`))
       } else li.append(el('span', 'st__job-p', j.status === 'error' ? 'Failed' : 'Cancelled'))
       if (j.error) li.append(el('span', 'st__job-e', j.error))
       li.append(el('i', 'st__job-bar', ''))
@@ -578,5 +610,6 @@ export function setupStudio() {
   writeForm()
   setMode(mode)
   paintControls()
+  paintParts()
   recompile(true)
 }

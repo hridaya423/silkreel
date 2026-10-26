@@ -143,13 +143,14 @@ function extractTextLike(node: SExprNode[], file: string): KicadTextInfo {
         x: toNumber(atAtoms[0] ?? '0', file, 'text x'),
         y: toNumber(atAtoms[1] ?? '0', file, 'text y')
       }
-      if (atAtoms[2] !== undefined) info.rot = toNumber(atAtoms[2], file, 'text rotation')
+      const rot = Number.parseFloat(atAtoms[2] ?? '')
+      if (Number.isFinite(rot)) info.rot = rot
     } else if (h === 'layer') {
       const layerAtoms = atomsAfterHead(child)
       info.layerId = layerAtoms[0] ?? info.layerId
       if (layerAtoms.includes('mirror')) info.mirrored = true
     } else if (h === 'hide' || h === 'hidden') {
-      info.hidden = true
+      info.hidden = atomsAfterHead(child)[0] !== 'no'
     } else if (h === 'effects') {
       const font = firstListNamed(child, 'font')
       if (font) {
@@ -161,8 +162,10 @@ function extractTextLike(node: SExprNode[], file: string): KicadTextInfo {
         if (hasAtom(font, 'mirror')) info.mirrored = true
       }
       if (!info.mirrored && hasAtom(child, 'mirror')) info.mirrored = true
+      if (hasAtom(child, 'hide')) info.hidden = true
     }
   }
+  if (atoms.slice(valueAtomIndex + 1).includes('hide')) info.hidden = true
   return info
 }
 
@@ -206,12 +209,25 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
   const netNodesById = new Map<number, NetNodeRef[]>()
   const layersDecl = firstListNamed(root, 'layers')
   const declaredCopperLayerIds: string[] = []
+  // KiCad 5 and older let a copper layer carry a free name ("Top", "GND"); its number says which layer it is
+  const layerAlias = new Map<string, string>()
   if (layersDecl) {
     for (const entry of children(layersDecl)) {
       if (!isList(entry)) continue
-      const layerId = atomsAfterHead(entry)[0]
+      const num = Number.parseInt(head(entry), 10)
+      let layerId = atomsAfterHead(entry)[0]
+      const type = atomsAfterHead(entry)[1]
+      if (layerId !== undefined && layerKindOf(layerId) === undefined && Number.isInteger(num) && ['signal', 'power', 'mixed', 'jumper'].includes(type ?? '')) {
+        const canonical = num === 0 ? 'F.Cu' : num === 31 ? 'B.Cu' : `In${num}.Cu`
+        layerAlias.set(layerId, canonical)
+        layerId = canonical
+      }
       if (layerId !== undefined && layerKindOf(layerId) === 'copper') declaredCopperLayerIds.push(layerId)
     }
+  }
+  const layerOf = (node: SExprNode[], fallback: string): string => {
+    const id = atomsAfterHead(node)[0] ?? fallback
+    return layerAlias.get(id) ?? id
   }
 
   function copperFor(layerId: string): CopperLayers {
@@ -280,7 +296,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const widthNode = firstListNamed(seg, 'width')
     const width = widthNode ? toNumber(atomsAfterHead(widthNode)[0] ?? '0.25', fileName, 'segment width') : 0.25
     const layerNode = firstListNamed(seg, 'layer')
-    const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.Cu') : 'F.Cu'
+    const layerId = layerNode ? layerOf(layerNode, 'F.Cu') : 'F.Cu'
     pushTrace(layerId, [parseXY(startNode, fileName), parseXY(endNode, fileName)], width, netAtomOf(seg))
   }
 
@@ -296,7 +312,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const widthNode = firstListNamed(arcSeg, 'width')
     const width = widthNode ? toNumber(atomsAfterHead(widthNode)[0] ?? '0.25', fileName, 'arc width') : 0.25
     const layerNode = firstListNamed(arcSeg, 'layer')
-    const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.Cu') : 'F.Cu'
+    const layerId = layerNode ? layerOf(layerNode, 'F.Cu') : 'F.Cu'
     const points = mid ? approximateArc(parseXY(startNode, fileName), mid, parseXY(endNode, fileName)) : [parseXY(startNode, fileName), parseXY(endNode, fileName)]
     pushTrace(layerId, points, width, netAtomOf(arcSeg))
   }
@@ -315,7 +331,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const eid = nextId(ids)
     const via: Via = { id: `v:${eid}`, pos, dia, drill: drillDia, netId: bindNet(netAtomOf(viaNode), 'via', `v:${eid}`) }
     const viaLayers = listsNamed(viaNode, 'layers')
-    const targetLayer = viaLayers.length > 0 ? (atomsAfterHead(viaLayers[0] as SExprNode[])[0] ?? 'F.Cu') : 'F.Cu'
+    const targetLayer = viaLayers.length > 0 ? layerOf(viaLayers[0] as SExprNode[], 'F.Cu') : 'F.Cu'
     ensureLayer(targetLayer)
     copperFor(targetLayer).vias.push(via)
     bbox.radius(pos, dia / 2)
@@ -327,18 +343,26 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     if (!ptsNode) continue
     const points = listsNamed(ptsNode, 'xy').map((xy) => parseXY(xy, fileName))
     if (points.length < 3) continue
-    const fills: Vec2[][] = []
-    for (const filled of listsNamed(zoneNode, 'filled_polygon')) {
-      const fpts = firstListNamed(filled, 'pts')
-      if (fpts) fills.push(listsNamed(fpts, 'xy').map((xy) => parseXY(xy, fileName)))
+    if (firstListNamed(zoneNode, 'keepout') !== undefined) continue
+    const one = firstListNamed(zoneNode, 'layer')
+    const many = firstListNamed(zoneNode, 'layers')
+    const spec = one ? [layerOf(one, 'F.Cu')] : many ? atomsAfterHead(many).map((t) => layerAlias.get(t) ?? t) : ['F.Cu']
+    const zoneLayerIds = resolvePadLayers(spec, declaredCopperLayerIds, [])
+    const netAtom = netAtomOf(zoneNode)
+    for (const layerId of zoneLayerIds) {
+      const fills: Vec2[][] = []
+      for (const filled of listsNamed(zoneNode, 'filled_polygon')) {
+        const fillLayer = firstListNamed(filled, 'layer')
+        if (fillLayer && layerOf(fillLayer, layerId) !== layerId) continue
+        const fpts = firstListNamed(filled, 'pts')
+        if (fpts) fills.push(listsNamed(fpts, 'xy').map((xy) => parseXY(xy, fileName)))
+      }
+      const eid = nextId(ids)
+      const zone: Zone = { id: `z:${eid}`, outline: points, fills, netId: bindNet(netAtom, 'zone', `z:${eid}`) }
+      ensureLayer(layerId)
+      copperFor(layerId).zones.push(zone)
     }
-    const eid = nextId(ids)
-    const zone: Zone = { id: `z:${eid}`, outline: points, fills, netId: bindNet(netAtomOf(zoneNode), 'zone', `z:${eid}`) }
-    const zoneLayers = listsNamed(zoneNode, 'layer')
-    const layerId = zoneLayers.length > 0 ? (atomsAfterHead(zoneLayers[0] as SExprNode[])[0] ?? 'F.Cu') : 'F.Cu'
-    ensureLayer(layerId)
-    copperFor(layerId).zones.push(zone)
-    for (const p of points) bbox.point(p)
+    if (zoneLayerIds.length > 0) for (const p of points) bbox.point(p)
   }
 
   interface PadRecord {
@@ -392,7 +416,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     }
 
     const layerNodes = listsNamed(node, 'layers')
-    const layerSpec = layerNodes.length > 0 ? atomsAfterHead(layerNodes[0] as SExprNode[]) : []
+    const layerSpec = layerNodes.length > 0 ? atomsAfterHead(layerNodes[0] as SExprNode[]).map((t) => layerAlias.get(t) ?? t) : []
     const throughHole = padType === 'thru_hole' || padType === 'connect' || padType === 'np_thru_hole'
     const targetLayers = resolvePadLayers(
       layerSpec,
@@ -413,7 +437,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerNode = firstListNamed(node, 'layer')
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.SilkS') : 'F.SilkS'
     const strokeNode = firstListNamed(node, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_line width') : 0.12
     const a = parseXY(startNode, fileName)
     const b = parseXY(endNode, fileName)
@@ -439,7 +463,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.SilkS') : 'F.SilkS'
     if (!/\.SilkS$/.test(layerId)) return
     const strokeNode = firstListNamed(node, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_arc width') : 0.12
     const approx = approximateArc(parseXY(startNode, fileName), parseXY(midNode, fileName), parseXY(endNode, fileName))
     const shifted = approx.map((p) => rotatePoint({ x: fpOrigin.x + p.x, y: fpOrigin.y + p.y }, fpOrigin, fpRot))
@@ -496,7 +520,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     return footprintNodeById.get(fp.ref) ?? []
   }
 
-  for (const fpNode of listsNamed(root, 'footprint')) {
+  for (const fpNode of [...listsNamed(root, 'footprint'), ...listsNamed(root, 'module')]) {
     const second: SExprNode | undefined = fpNode[1]
     const libId = second !== undefined && isAtom(second) ? second : undefined
     const atNode = firstListNamed(fpNode, 'at')
@@ -507,7 +531,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       if (atAtoms[2] !== undefined) fpRot = toNumber(atAtoms[2], fileName, 'footprint rotation')
     }
     const layerNode = firstListNamed(fpNode, 'layer')
-    const fpLayer = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.Cu') : 'F.Cu'
+    const fpLayer = layerNode ? layerOf(layerNode, 'F.Cu') : 'F.Cu'
     const ref =
       propertyValue(fpNode, 'Reference') ??
       fpTextField(fpNode, 'reference') ??
@@ -519,7 +543,8 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       rot: fpRot,
       layer: fpLayer,
       padRefs: [],
-      silkRefs: []
+      silkRefs: [],
+      model: modelName(fpNode)
     }
     footprintNodeById.set(ref, fpNode)
     for (const child of children(fpNode)) {
@@ -547,7 +572,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const eLocal = parseXY(endNode, fileName)
     const radius = Math.hypot(eLocal.x - cLocal.x, eLocal.y - cLocal.y)
     const strokeNode = firstListNamed(node, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_circle width') : 0.12
     const center = rotatePoint({ x: fpOrigin.x + cLocal.x, y: fpOrigin.y + cLocal.y }, fpOrigin, fpRot)
     if (/\.SilkS$/.test(layerId)) {
@@ -570,7 +595,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.SilkS') : 'F.SilkS'
     if (!/\.SilkS$/.test(layerId)) return
     const strokeNode = firstListNamed(node, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_poly width') : 0.12
     let localPts: Vec2[] = []
     const ptsNode = firstListNamed(node, 'pts')
@@ -620,7 +645,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerNode = firstListNamed(gl, 'layer')
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'Edge.Cuts') : 'Edge.Cuts'
     const strokeNode = firstListNamed(gl, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(gl, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.1', fileName, 'gr_line width') : 0.1
     if (layerId === 'Edge.Cuts') {
       outline.push({ id: `o:${nextId(ids)}`, points: [a, b], closed: false, layerId })
@@ -648,7 +673,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerNode = firstListNamed(gr, 'layer')
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'Edge.Cuts') : 'Edge.Cuts'
     const strokeNode = firstListNamed(gr, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(gr, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.1', fileName, 'outline width') : 0.1
     if (layerId === 'Edge.Cuts') {
       outline.push({ id: `o:${nextId(ids)}`, points, closed: isRect || points.length > 2, layerId })
@@ -668,7 +693,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'Edge.Cuts') : 'Edge.Cuts'
     const approx = approximateArc(parseXY(startNode, fileName), parseXY(midNode, fileName), parseXY(endNode, fileName))
     const strokeNode = firstListNamed(ga, 'stroke')
-    const wNode = strokeNode ? firstListNamed(strokeNode, 'width') : undefined
+    const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(ga, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'gr_arc width') : 0.12
     if (layerId === 'Edge.Cuts') {
       outline.push({ id: `o:${nextId(ids)}`, points: approx, closed: false, layerId })
@@ -710,7 +735,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
   }
   netsOut.sort((a, b) => a.id - b.id)
 
-  if (!bbox.started) throw new ParseError(fileName, 'board contains no geometric elements')
+  if (!bbox.started) throw new ParseError(fileName, 'the board is empty, with no outline, copper or parts yet')
 
   const stats = {
     traces: Object.values(copper).reduce((n, c) => n + c.traces.length, 0),
@@ -776,6 +801,9 @@ function resolvePadLayers(layerSpec: string[], declaredCopperLayerIds: string[],
   for (const tok of layerSpec) {
     if (tok === '*.Cu') {
       for (const layerId of declaredCopperLayerIds) add(layerId)
+    } else if (tok === 'F&B.Cu') {
+      add('F.Cu')
+      add('B.Cu')
     } else if (/\.Cu$/.test(tok)) {
       add(tok)
     }
@@ -853,4 +881,10 @@ function approximateFullCircle(c: Vec2, r: number): Vec2[] {
     out.push({ x: c.x + safeR * Math.cos(t), y: c.y + safeR * Math.sin(t) })
   }
   return out
+}
+
+function modelName(fpNode: SExprNode[]): string | undefined {
+  const model = firstListNamed(fpNode, 'model')
+  const path = model ? atomsAfterHead(model)[0] : undefined
+  return path?.split(/[\\/]/).pop()?.replace(/\.[^.]*$/, '')
 }

@@ -20,23 +20,11 @@ describe('studio board summary', () => {
 })
 
 describe('studio export response mapping', () => {
-  it('keeps the submitted id and exposes the advisory report', () => {
-    const job = toExportJob('job-1', {
-      status: 'done',
-      progress: 100,
-      metricsReport: {
-        passed: false,
-        rules: [{ rule: 'coverage', passed: false, detail: 'peak lit 1.2% vs expected 3-70%' }]
-      }
-    })
+  it('keeps the submitted id and the time left', () => {
+    const job = toExportJob('job-1', { status: 'rendering', progress: 40, etaSeconds: 31 })
 
-    expect(job).toMatchObject({
-      jobId: 'job-1',
-      status: 'done',
-      progress: 100,
-      gatePassed: false,
-      gateDetail: 'coverage: peak lit 1.2% vs expected 3-70%'
-    })
+    expect(job).toMatchObject({ jobId: 'job-1', status: 'rendering', progress: 40, etaSeconds: 31 })
+    expect(toExportJob('job-2', { status: 'pending', progress: 0 }).etaSeconds).toBeNull()
   })
 })
 

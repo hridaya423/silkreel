@@ -135,17 +135,11 @@ interface JobResponse {
   jobId: string
 }
 
-interface MetricsResponse {
-  passed: boolean
-  rules: Array<{ rule: string; passed: boolean; detail: string }>
-}
-
 interface RenderJobResponse {
   status: JobPhase
   progress: number
   error?: string
-  metricsReport?: MetricsResponse
-  metricsError?: string
+  etaSeconds?: number | null
 }
 
 type JobPhase = 'pending' | 'rendering' | 'done' | 'error' | 'cancelled'
@@ -154,8 +148,7 @@ export interface ExportJob {
   jobId: string
   status: JobPhase
   progress: number
-  gatePassed: boolean | null
-  gateDetail: string | null
+  etaSeconds: number | null
   error: string | null
 }
 
@@ -164,8 +157,7 @@ export function toExportJob(jobId: string, response: RenderJobResponse): ExportJ
     jobId,
     status: response.status,
     progress: response.progress,
-    gatePassed: response.metricsReport?.passed ?? null,
-    gateDetail: response.metricsReport?.rules.map((rule) => `${rule.rule}: ${rule.detail}`).join(' · ') ?? response.metricsError ?? null,
+    etaSeconds: response.etaSeconds ?? null,
     error: response.error ?? null
   }
 }
@@ -208,7 +200,8 @@ export interface PollJobOptions {
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 1200
-const DEFAULT_MAX_POLL_ATTEMPTS = 100
+// thirty minutes: a slow trace render on a CPU-only machine can take several
+const DEFAULT_MAX_POLL_ATTEMPTS = 1500
 
 function createAbortError(): Error {
   const error = new Error('operation aborted')
@@ -245,6 +238,40 @@ export async function pollJob(jobId: string, options: PollJobOptions = {}): Prom
     if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') return job
   }
   throw new Error('job polling timed out')
+}
+
+export type DemoOutlines = Record<string, { w: number; h: number; d: string; holes: Array<[number, number, number]> }>
+
+export function useDemoOutlines(): DemoOutlines | null {
+  const [outlines, setOutlines] = useState<DemoOutlines | null>(null)
+  useEffect(() => {
+    void fetch(`${API}/api/outlines`).then(async (r) => {
+      if (r.ok) setOutlines((await r.json()) as DemoOutlines)
+    }, () => undefined)
+  }, [])
+  return outlines
+}
+
+/** whether the render API answers; rechecked every few seconds while it does not */
+export function useRenderApi(): boolean | null {
+  const [up, setUp] = useState<boolean | null>(null)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let live = true
+    const check = (): void => {
+      void fetch(`${API}/api/health`).then((r) => r.ok, () => false).then((ok) => {
+        if (!live) return
+        setUp(ok)
+        timer = setTimeout(check, ok ? 15000 : 3000)
+      })
+    }
+    check()
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [])
+  return up
 }
 
 export function downloadUrl(jobId: string): string {

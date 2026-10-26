@@ -33,4 +33,20 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['b.kicad_pcb', '--accent', 'red'])).toThrow(/--accent/)
     expect(() => parseCliArgs([])).toThrow(/usage/)
   })
+
+  it('reads --hero and --mask, and rejects a mask colour it does not know', () => {
+    const a = parseCliArgs(['b.kicad_pcb', '--hero', 'U3', '--mask', 'blue'])
+    expect(a.config).toMatchObject({ hero: 'U3', mask: 'blue' })
+    expect(() => parseCliArgs(['b.kicad_pcb', '--mask', 'teal'])).toThrow(/--mask/)
+  })
+
+  it('answers --help and -h without a board', () => {
+    expect(parseCliArgs(['--help']).help).toBe(true)
+    expect(parseCliArgs(['-h']).help).toBe(true)
+  })
+
+  it('suggests the nearest flag for a typo', () => {
+    expect(() => parseCliArgs(['b.kicad_pcb', '--styel', 'glyph'])).toThrow(/Did you mean --style\?/)
+    expect(() => parseCliArgs(['b.kicad_pcb', '--zzzzzzz'])).toThrow(/Unknown option --zzzzzzz\. Run with --help/)
+  })
 })

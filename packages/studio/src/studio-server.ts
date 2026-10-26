@@ -2,7 +2,7 @@ import type { Connect, Plugin } from 'vite'
 import type { ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { DEMO_IDS, isDemoId, loadDemoBoard, parseKicadText } from './board-server.js'
+import { DEMO_IDS, demoOutline, isDemoId, loadDemoBoard, parseKicadText } from './board-server.js'
 
 const DEFAULT_RENDER_API_URL = 'http://127.0.0.1:3102'
 const DEFAULT_STUDIO_PORT = 3101
@@ -71,10 +71,11 @@ function requestUrl(req: Connect.IncomingMessage): URL {
 }
 
 function isApiPath(pathname: string): boolean {
-  return pathname === '/api/demos' || pathname.startsWith('/api/demo/') || pathname === '/api/parse' || pathname === '/api/export' || pathname.startsWith('/api/job/') || pathname.startsWith('/api/download/')
+  return pathname === '/api/health' || pathname === '/api/outlines' || pathname === '/api/demos' || pathname.startsWith('/api/demo/') || pathname === '/api/parse' || pathname === '/api/export' || pathname.startsWith('/api/job/') || pathname.startsWith('/api/download/')
 }
 
 const PROXY_MAP: Array<{ match: RegExp; target: (pathname: string) => string }> = [
+  { match: /^\/api\/health$/, target: () => '/health' },
   { match: /^\/api\/export$/, target: () => '/render' },
   { match: /^\/api\/job\//, target: (pathname) => pathname.replace('/api/job/', '/job/') },
   { match: /^\/api\/download\//, target: (pathname) => pathname.replace('/api/download/', '/download/') }
@@ -92,6 +93,10 @@ async function handle(req: Connect.IncomingMessage, res: ServerResponse, renderA
   const pathname = url.pathname
   if (pathname === '/api/demos' && req.method === 'GET') {
     json(res, 200, { demos: DEMO_IDS })
+    return
+  }
+  if (pathname === '/api/outlines' && req.method === 'GET') {
+    json(res, 200, Object.fromEntries(await Promise.all(DEMO_IDS.map(async (id) => [id, await demoOutline(id)] as const))))
     return
   }
   if (pathname.startsWith('/api/demo/') && req.method === 'GET') {

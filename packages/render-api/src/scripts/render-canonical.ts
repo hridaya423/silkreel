@@ -21,7 +21,7 @@ try {
   const result = await renderFilm({
     inputProps,
     outputLocation: outPath,
-    onProgress: (pct) => {
+    onProgress: ({ pct }) => {
       console.log(`render ${pct}%`)
     }
   })

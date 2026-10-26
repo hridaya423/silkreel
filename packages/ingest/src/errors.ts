@@ -3,7 +3,7 @@ export class IngestError extends Error {
   readonly reason: string
 
   constructor(file: string, reason: string) {
-    super(`Failed to ingest "${file}": ${reason}`)
+    super(`Could not read ${file}: ${reason}.`)
     this.name = 'IngestError'
     this.file = file
     this.reason = reason

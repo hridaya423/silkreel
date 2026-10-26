@@ -6,11 +6,11 @@ import { ParseError } from './errors.js'
 
 export function parseKicadPcb(contents: string, fileName = 'board.kicad_pcb'): BoardModel {
   if (looksLikeBinary(contents)) {
-    throw new ParseError(fileName, 'file appears to be binary, not a KiCad s-expression document')
+    throw new ParseError(fileName, 'it is a binary file, not a KiCad board file')
   }
   const root = parseSExpr(contents, fileName)
   if (head(root) !== 'kicad_pcb') {
-    throw new ParseError(fileName, `expected a (kicad_pcb ...) document, found (${head(root)} ...)`)
+    throw new ParseError(fileName, `it is a KiCad file, but not a board: it starts with (${head(root)} ...), not (kicad_pcb ...)`)
   }
   return classifyKicad(root, fileName)
 }

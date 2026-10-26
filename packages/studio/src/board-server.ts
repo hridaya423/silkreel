@@ -32,4 +32,17 @@ export function parseKicadText(fileName: string, contents: string): BoardModel {
   return parseKicadPcb(contents, fileName)
 }
 
+/** a demo board's real outline and big holes as SVG, scaled into a 100-unit-wide box */
+export async function demoOutline(demoId: DemoId): Promise<{ w: number; h: number; d: string; holes: Array<[number, number, number]> }> {
+  const board = await loadDemoBoard(demoId)
+  const pts = board.outline.flatMap((o) => o.points)
+  const x0 = Math.min(...pts.map((p) => p.x))
+  const y0 = Math.min(...pts.map((p) => p.y))
+  const k = 100 / Math.max(1e-6, Math.max(...pts.map((p) => p.x)) - x0)
+  const r = (n: number): number => Math.round(n * 10) / 10
+  const d = board.outline.map((o) => o.points.map((p, i) => `${i ? 'L' : 'M'}${r((p.x - x0) * k)} ${r((p.y - y0) * k)}`).join('') + (o.closed ? 'Z' : '')).join('')
+  const holes = board.drill.filter((h) => h.dia >= 2).map((h): [number, number, number] => [r((h.pos.x - x0) * k), r((h.pos.y - y0) * k), r((h.dia / 2) * k)])
+  return { w: 100, h: r((Math.max(...pts.map((p) => p.y)) - y0) * k), d, holes }
+}
+
 export { DEMO_IDS }

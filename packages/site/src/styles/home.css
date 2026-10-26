@@ -44,7 +44,8 @@ html.gl .hero__poster { visibility: hidden; }
 .hero__title { font-size: clamp(1.4rem, 0.4rem + 2.7vw, 3.3rem); }
 .hero__title .lt svg { margin-left: auto; }
 .hero__lede { max-width: min(32ch, 27vw); text-align: left; font-size: var(--t-m); line-height: 1.5; color: var(--c-muted); }
-.hero__act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+/* stacked and right-set, so the row never reaches over the reel's arc */
+.hero__act { display: grid; justify-items: end; gap: 12px; }
 .hero__cmd { display: flex; align-items: center; gap: 12px; min-height: 44px; min-width: 0; padding: 0 6px 0 14px; background: linear-gradient(rgb(var(--ink-rgb) / 0.035) 0 0) var(--c-bg); }
 .hero__cmd code { min-width: 0; overflow-x: auto; font-family: var(--f-mono); font-size: var(--t-xs); font-stretch: 75%; white-space: nowrap; scrollbar-width: none; }
 .hero__cmd .term__copy { margin-left: 0; border-radius: 6px; }
@@ -74,7 +75,7 @@ html.gl .hero__poster { visibility: hidden; }
 .dwg ~ .looks { padding-top: 0; }
 .looks { position: relative; z-index: 1; background: var(--c-bg); padding-top: var(--sec); overflow: clip; }
 /* the looks open inside the stock: one line of type set across both frames, the seam between them running down from it in red */
-.looks__head { position: relative; z-index: 1; display: grid; justify-items: center; gap: 18px; padding: clamp(24px, 5vh, 56px) var(--gutter) clamp(28px, 5vh, 52px); text-align: center; }
+.looks__head { position: relative; z-index: 1; background: var(--stock); display: grid; justify-items: center; gap: 18px; padding: clamp(24px, 5vh, 56px) var(--gutter) clamp(28px, 5vh, 52px); text-align: center; }
 .looks__title { font-size: clamp(1.5rem, 0.3rem + 3.6vw, 4.1rem); color: #f4f4f0; }
 .looks__title .lt svg { margin-inline: auto; }
 .looks__body { max-width: 40ch; font-size: var(--t-body); line-height: 1.5; color: #a9a9a3; }
@@ -91,9 +92,9 @@ html.gl .hero__poster { visibility: hidden; }
 .look__k { font-size: var(--t-s); font-weight: 600; color: #f4f4f0; }
 .look__frame { position: relative; aspect-ratio: 16 / 9; background: #050505; overflow: hidden; outline: 1px solid #303030; }
 .look__frame video, .look__frame canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* the trace look is the film the drawing hands over to: it lies on the drawn board, opens out, then lands in its frame (motion/drawing.ts).
+/* the glyph look is the film the drawing hands over to: its plan lies on the drawn board, opens out, then lands in its frame (motion/drawing.ts).
    In flight it passes under the looks heading */
-.look__frame video.is-flying {
+.look__frame canvas.is-flying {
   --fe: 1; position: fixed; left: 0; top: 0; z-index: 0; width: 1280px; height: 720px; max-width: none; transform-origin: 0 0; pointer-events: none;
   mask-image: linear-gradient(90deg, transparent, #000 calc(var(--fe) * 16%), #000 calc(100% - var(--fe) * 16%), transparent), linear-gradient(transparent, #000 calc(var(--fe) * 22%), #000 calc(100% - var(--fe) * 22%), transparent);
   mask-composite: intersect;
@@ -225,14 +226,16 @@ html:not(.motion) .gate__pin { height: auto; min-height: 100svh; }
 html:not(.motion) .gate__body { display: none; }
 
 /* ---------- tablet and phone ---------- */
-/* the hero stacks its words above the coil below 900 px, where the coil and a right-hand column no longer both fit */
-@media (max-width: 900px) {
+/* the hero stacks its words above the coil below 1100 px, where the coil and a right-hand column no longer both fit */
+@media (max-width: 1100px) {
   .hero__poster { translate: none; }
   .hero__say { left: var(--gutter); right: var(--gutter); top: 84px; max-width: none; justify-items: start; text-align: left; gap: 14px; }
-  .hero__act { justify-content: flex-start; max-width: 100%; }
-  .hero__open { display: none; }
+  .hero__act { display: flex; flex-wrap: wrap; max-width: 100%; }
   .hero__cmd { max-width: 100%; }
   .hero__lede { max-width: 32ch; }
+}
+@media (max-width: 900px) {
+  .hero__open { display: none; }
 }
 @media (max-width: 760px) {
   .make__head { grid-template-columns: minmax(0, 1fr); }

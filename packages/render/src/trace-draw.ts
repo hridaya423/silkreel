@@ -122,14 +122,12 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     ctx.fillStyle = pal.bg
     ctx.fillRect(0, 0, W, H)
   }
-  const fade = 1 - within(p, s.beats.fade)
-  if (fade <= 0.002) return 0
   const cam = sampleCamera(s.camera, p, W, H)
   ctx.save()
   ctx.translate(W / 2, H / 2)
   ctx.scale(cam.zoom, cam.zoom)
   ctx.translate(-cam.cx, -cam.cy)
-  ctx.globalAlpha = fade
+  ctx.globalAlpha = 1
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   let drawn = 0
@@ -139,7 +137,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
   if (outlineFrac > 0) {
     ctx.strokeStyle = pal.silk
     ctx.lineWidth = 1.5
-    ctx.globalAlpha = fade * 0.7
+    ctx.globalAlpha = 0.7
     for (const path of s.outline) {
       strokeReveal(ctx, path, outlineFrac)
       drawn += 1
@@ -148,7 +146,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     // a focal point; cutouts and short edges would turn it into confetti
     if (outlineFrac < 1) {
       ctx.fillStyle = pal.head
-      ctx.globalAlpha = fade
+      ctx.globalAlpha = 1
       for (const path of [...s.outline].sort((a, b) => pathLength(b) - pathLength(a)).slice(0, OUTLINE_HEADS)) {
         const [x, y] = pointAt(path, outlineFrac)
         ctx.beginPath()
@@ -164,7 +162,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
   const drillAlpha = 0.3 * outlineFrac
   if (drillAlpha > 0.001) {
     ctx.fillStyle = pal.copperDim
-    ctx.globalAlpha = fade * drillAlpha
+    ctx.globalAlpha = drillAlpha
     for (const d of s.drills) {
       ctx.beginPath()
       ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
@@ -186,11 +184,11 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     // whole boards into amber mush and killed copper contrast
     tracePath(ctx, zone.fill)
     ctx.fillStyle = pal.copperDim
-    ctx.globalAlpha = fade * (zone.side === 'F' ? 0.07 : 0.035)
+    ctx.globalAlpha = (zone.side === 'F' ? 0.07 : 0.035)
     ctx.fill()
     ctx.strokeStyle = pal.copperDim
     ctx.lineWidth = 1
-    ctx.globalAlpha = fade * 0.2
+    ctx.globalAlpha = 0.2
     ctx.stroke()
     ctx.restore()
     drawn += 1
@@ -242,7 +240,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
       const frac = (p - t0) / Math.max(1e-6, t1 - t0)
       const hx = x0 + (x1 - x0) * frac
       const hy = y0 + (y1 - y0) * frac
-      ctx.globalAlpha = fade * (front ? 1 : 0.45)
+      ctx.globalAlpha = (front ? 1 : 0.45)
       ctx.lineWidth = w
       ctx.beginPath()
       ctx.moveTo(x0, y0)
@@ -256,7 +254,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
       }
       drawn += 1
     }
-    ctx.globalAlpha = fade * (front ? 1 : 0.45)
+    ctx.globalAlpha = (front ? 1 : 0.45)
     for (const [w, path] of batches) {
       ctx.lineWidth = w
       ctx.stroke(path)
@@ -273,7 +271,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
       grad.addColorStop(1, withAlpha(pal.head, 0.9))
       ctx.strokeStyle = grad
       ctx.lineWidth = head.w * 2
-      ctx.globalAlpha = fade
+      ctx.globalAlpha = 1
       ctx.beginPath()
       ctx.moveTo(head.tx, head.ty)
       ctx.lineTo(head.x, head.y)
@@ -281,7 +279,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
       drawn += 1
     }
     ctx.fillStyle = pal.head
-    ctx.globalAlpha = fade
+    ctx.globalAlpha = 1
     for (const head of heads.slice(0, 80)) {
       ctx.beginPath()
       ctx.arc(head.x, head.y, Math.max(2, head.w * 1.3), 0, Math.PI * 2)
@@ -295,7 +293,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     if (p < via.t) continue
     ctx.strokeStyle = pal.copper
     ctx.lineWidth = Math.max(0.8, via.r * 0.35)
-    ctx.globalAlpha = fade * 0.8
+    ctx.globalAlpha = 0.8
     ctx.beginPath()
     ctx.arc(via.x, via.y, via.r, 0, Math.PI * 2)
     ctx.stroke()
@@ -303,7 +301,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     const flash = 1 - (p - via.t) / 0.03
     if (flash > 0) {
       ctx.strokeStyle = pal.head
-      ctx.globalAlpha = fade * flash
+      ctx.globalAlpha = flash
       ctx.beginPath()
       ctx.arc(via.x, via.y, via.r * 1.4, 0, Math.PI * 2)
       ctx.stroke()
@@ -325,17 +323,17 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
       // the frame and ride over the bloom threshold
       ctx.strokeStyle = pad.side === 'B' ? pal.copperDim : pal.copper
       ctx.lineWidth = 1.5
-      ctx.globalAlpha = fade * (pad.side === 'B' ? 0.55 : 0.85)
+      ctx.globalAlpha = (pad.side === 'B' ? 0.55 : 0.85)
       ctx.stroke()
     } else {
       ctx.fillStyle = pad.side === 'B' ? pal.copperDim : pal.copper
-      ctx.globalAlpha = fade * (pad.side === 'B' ? 0.55 : 0.85)
+      ctx.globalAlpha = (pad.side === 'B' ? 0.55 : 0.85)
       ctx.fill()
     }
     if (k < 1) {
       ctx.strokeStyle = pal.head
       ctx.lineWidth = 1
-      ctx.globalAlpha = fade * 0.5 * (1 - k)
+      ctx.globalAlpha = 0.5 * (1 - k)
       ctx.stroke()
     }
     ctx.restore()
@@ -348,7 +346,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
   // dozens of overlapping lines that would otherwise add up to solid white
   ctx.strokeStyle = pal.silk
   ctx.lineWidth = 1
-  ctx.globalAlpha = fade * 0.45
+  ctx.globalAlpha = 0.45
   const silkDone = new Path2D()
   let silkDoneCount = 0
   for (const stroke of s.silkStrokes) {
@@ -376,7 +374,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     ctx.translate(text.x, text.y)
     ctx.rotate(text.rot)
     ctx.font = `${text.size}px ${FONT}`
-    ctx.globalAlpha = fade * 0.7
+    ctx.globalAlpha = 0.7
     ctx.fillText(shown, 0, 0)
     ctx.restore()
     drawn += 1
@@ -401,7 +399,7 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
     gradient.addColorStop(1, 'rgba(0,0,0,0)')
     ctx.save()
     ctx.globalCompositeOperation = 'lighter'
-    ctx.globalAlpha = fade * 0.25
+    ctx.globalAlpha = 0.25
     ctx.strokeStyle = gradient
     for (const layer of s.layers) {
       if (layer.side !== topSide) continue
@@ -431,6 +429,6 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
   ctx.restore()
 
   // 10 title card — screen space, after the camera transform is popped
-  drawTitle(ctx, tl, p, fade)
+  drawTitle(ctx, tl, p, 1)
   return drawn
 }

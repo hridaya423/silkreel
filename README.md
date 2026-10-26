@@ -4,7 +4,8 @@
 
 <p align="center">
   <b>A KiCad board in. A release film out.</b><br />
-  silk reel reads a <code>.kicad_pcb</code> and renders a film of that board, built from its real copper, parts and silkscreen.
+  silk reel reads a <code>.kicad_pcb</code> and renders a film of that board, built from its real copper, parts and silkscreen.<br />
+  <a href="https://silkreel.hridya.tech/studio">Try it in your browser</a> with your own board. You do not need to install anything.
 </p>
 
 <p align="center">
@@ -21,11 +22,13 @@
 | Trace | Glyph |
 |---|---|
 | ![The Glasgow board as a trace film](.github/media/glasgow-trace.gif) | ![The Glasgow board as a glyph film](.github/media/glasgow-glyph.gif) |
-| The lit board under a camera. Copper routes out from the hero chip, the mask and silkscreen go on, the parts drop onto paste and reflow, and then the board powers on. 12 seconds, with sound. | Every part of the board set as type, in a loop. The hero chip's routes grow, the plan rises, a frame closes around it, and the loop seam is invisible. 11.2 seconds. |
+| A camera films the lit board. The copper routes extend out from the hero chip. The mask and silkscreen go on, and the parts drop onto paste and reflow. Then the board powers on. The film runs 12 seconds, with sound. | silk reel sets every part of the board as type. The routes of the hero chip extend out, the plan of the board appears, and a frame closes around it. The film is an 11.2-second loop with no visible seam. |
 
 Both films above are the [Glasgow](https://github.com/GlasgowEmbedded/glasgow) rev C3 board, rendered with the commands below.
 
 ## Quick start
+
+You need Node.js 22 or later, and `ffmpeg` and `ffprobe` on your PATH.
 
 ```bash
 git clone https://github.com/hridaya423/silkreel
@@ -34,15 +37,19 @@ npm ci
 npm run reel -- fixtures/boards/glasgow.kicad_pcb --style trace --aspect 16:9 -o glasgow.mp4
 ```
 
-You need Node.js 22 or later, and `ffmpeg` and `ffprobe` on your PATH. The first render downloads a headless Chrome of about 90 MB, once.
+The first render downloads a headless Chrome of about 90 MB. Later renders use the same copy.
 
-To film your own board, give the CLI its file. silk reel reads `.kicad_pcb` files from KiCad 4 or later; it does not read Gerber, Eagle or Altium files.
+## Render your own board
+
+Give the CLI the `.kicad_pcb` file of your board. silk reel reads files from KiCad 4 or later. It does not read Gerber, Eagle or Altium files.
 
 ```bash
 npm run reel -- path/to/your-board.kicad_pcb --aspect 9:16 --title "Your Board" --version v1.0
 ```
 
-A trace film takes about 30 seconds on an Apple M4 Pro and comes out near 8 MB. It also writes `<name>.poster.png`, the last frame, for a cover image. A glyph film renders in about ten seconds, and `--draft` takes a fraction of the time. On a machine without a GPU, put `SILK_REEL_GL=swangle` in front of the command. Run `npm run reel -- --help` to list every flag.
+A trace film takes about 30 seconds to render on an Apple M4 Pro, and the file is near 8 MB. The CLI also writes `<name>.poster.png`, the last frame, for a cover image. A glyph film renders in about ten seconds. `--draft` renders faster at a lower quality.
+
+If your machine has no GPU, put `SILK_REEL_GL=swangle` in front of the command. To list every flag, run `npm run reel -- --help`.
 
 The film is about one part, the hero. silk reel picks the IC with the most pads, then any other part with eight or more pads, then the connector with the most pads. Name a different part with `--hero U3`.
 
@@ -60,7 +67,7 @@ The film is about one part, the hero. silk reel picks the IC with the most pads,
 | `--version` | a version under the title; needs `--title` | none |
 | `--format` | `mp4` · `gif` (720 px wide at most) · `webm-alpha` · `prores-alpha` (4444) | `mp4` |
 | `--seed` | any number; each one gives a different variation | `42` |
-| `--tempo` | pace, from `0.75` to `1.5` | `1` |
+| `--tempo` | the speed of the film, from `0.75` to `1.5` | `1` |
 | `--draft` | fast preview quality | off |
 | `--no-audio` | leave the score out of a trace film | off |
 | `-o` | output path | `<board>-<style>-<aspect>.<ext>` beside the input |
@@ -70,7 +77,7 @@ The alpha formats have a transparent background, so you can put the film over yo
 
 ## Studio
 
-The [website](packages/site) has a studio that runs in the browser. It plays a draft of both looks, for the sample boards and for your own board. Your board is read in the tab and never uploaded. It records WebM, saves stills, and writes the command for everything else.
+The [browser studio](https://silkreel.hridya.tech/studio) plays a draft of both looks, for the sample boards and for your own board. The tab reads your board file and does not upload it. The studio records WebM, saves stills, and writes the CLI command for everything else. Its source is in [`packages/site`](packages/site).
 
 Run the full studio on your machine to render every format from a queue:
 
@@ -82,9 +89,9 @@ npm run dev --workspace=@silk-reel/studio         # studio on :3101
 ## How it works
 
 1. **`ingest`** parses the `.kicad_pcb` into a board model: outline, copper on every layer, pads, vias, zones, footprints and silkscreen.
-2. **`choreo`** compiles the board into a timeline. A trace film is one camera arc on a 24-beat grid: the drawing, the object, a held breath, power-on and a hold. A glyph film picks the hero chip and sets the parts as glyphs across four acts.
+2. **`choreo`** compiles the board into a timeline. A trace film is four camera shots on a 24-beat grid. It starts as a flat drawing of the copper and turns into the built board. Then it pauses, powers on, and holds on the finished board. A glyph film picks the hero chip and sets the parts as glyphs across four acts.
 3. **`render`** draws each frame. Trace uses WebGL2: a lit plate with component bodies, a perspective camera, depth of field, HDR bloom and motion blur. Glyph draws with Canvas2D.
-4. **`render-api`** encodes the frames with Remotion and ffmpeg, and lays the score under trace films, mastered to −14 LUFS.
+4. **`render-api`** encodes the frames with Remotion and ffmpeg. For trace films, it adds the sound, mastered to −14 LUFS.
 
 | package | role |
 |---|---|
@@ -95,7 +102,7 @@ npm run dev --workspace=@silk-reel/studio         # studio on :3101
 | [`cli`](packages/cli) | `npm run reel` |
 | [`studio`](packages/studio) | the local studio (Vite and the Remotion Player) |
 | [`site`](packages/site) | the website and its in-browser studio (Astro) |
-| [`metrics`](packages/metrics) | ffmpeg probes and the numeric gate |
+| [`metrics`](packages/metrics) | ffmpeg probes and an advisory numeric gate |
 
 ## Development
 

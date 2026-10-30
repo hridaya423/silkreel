@@ -22,6 +22,7 @@
     "@silk-reel/ingest": "0.1.0",
     "@silk-reel/metrics": "0.1.0",
     "@silk-reel/render": "0.1.0",
-    "fastify": "^5.2.1"
+    "fastify": "^5.2.1",
+    "occt-import-js": "^0.0.23"
   }
 }

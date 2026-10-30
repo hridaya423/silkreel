@@ -9,9 +9,10 @@ export const HELP = `usage: npm run reel -- <board.kicad_pcb> [options]
 
 Renders a film of a KiCad board (KiCad 4 or later).
 
-  --style trace|glyph        trace: the lit board (default); glyph: parts set as type
+  --style trace|glyph|plot   trace: the lit board (default); glyph: parts set as type;
+                             plot: the board drawn in pen on paper
   --aspect 4:5|1:1|9:16|16:9 frame (default 4:5)
-  --palette copper|mono|blueprint|phosphor
+  --palette copper|mono|blueprint|phosphor|paper
   --accent #rrggbb           hero highlight colour
   --hero REF                 the part the film is about, e.g. U3 (default: the biggest IC)
   --mask ${MASK_COLORS.join('|')}
@@ -22,6 +23,9 @@ Renders a film of a KiCad board (KiCad 4 or later).
   --tempo 0.75-1.5           pace (default 1)
   --draft                    fast preview quality
   --no-audio                 leave the score out of a trace film
+  --models DIR               another folder of STEP models (repeatable); trace films show each
+                             part's own 3D model from the board's paths, the KiCad library and these
+  --no-models                estimated part bodies only
   -o PATH                    output file (default: <board>-<style>-<aspect>.<ext> beside the input)
   -h, --help                 this help`
 
@@ -40,6 +44,8 @@ const OPTIONS = {
   format: { type: 'string' },
   draft: { type: 'boolean' },
   'no-audio': { type: 'boolean' },
+  models: { type: 'string', multiple: true },
+  'no-models': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' }
 } as const
 
@@ -75,6 +81,8 @@ export interface CliArgs {
   /** one motion-blur sample and lighter maps: a fast look, not a release */
   draft: boolean
   audio: boolean
+  /** folders searched for part models; undefined: no models */
+  models: string[] | undefined
   help: boolean
 }
 
@@ -100,10 +108,10 @@ export function parseCliArgs(argv: string[]): CliArgs {
   }
   const { values, positionals } = parsed
   const input = positionals[0]
-  if (values.help === true) return { input: input ?? '', out: '', config: defaultFilmConfig(), format: 'mp4', draft: false, audio: true, help: true }
+  if (values.help === true) return { input: input ?? '', out: '', config: defaultFilmConfig(), format: 'mp4', draft: false, audio: true, models: undefined, help: true }
   if (input === undefined || positionals.length > 1) throw new Error(HELP)
 
-  const style = oneOf<StyleId>('style', values.style, ['trace', 'glyph']) ?? 'trace'
+  const style = oneOf<StyleId>('style', values.style, ['trace', 'glyph', 'plot']) ?? 'trace'
   const aspect = oneOf<Aspect>('aspect', values.aspect, Object.keys(ASPECT_SIZE) as Aspect[]) ?? '4:5'
   const palette = oneOf<PaletteId>('palette', values.palette, Object.keys(PALETTES) as PaletteId[])
   const format = oneOf<OutputFormat>('format', values.format, OUTPUT_FORMATS) ?? 'mp4'
@@ -136,5 +144,5 @@ export function parseCliArgs(argv: string[]): CliArgs {
   const out =
     values.out ??
     path.join(path.dirname(input), `${path.basename(input, '.kicad_pcb')}-${style}-${aspect.replace(':', 'x')}.${FORMAT_EXT[format]}`)
-  return { input, out, config, format, draft: values.draft === true, audio: values['no-audio'] !== true, help: false }
+  return { input, out, config, format, draft: values.draft === true, audio: values['no-audio'] !== true, models: values['no-models'] === true ? undefined : values.models ?? [], help: false }
 }

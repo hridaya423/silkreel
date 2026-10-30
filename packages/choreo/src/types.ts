@@ -82,9 +82,9 @@ export interface CastHints {
   preferTexts?: string[]
 }
 
-export type StyleId = 'trace' | 'glyph'
+export type StyleId = 'trace' | 'glyph' | 'plot'
 export type Aspect = '4:5' | '1:1' | '9:16' | '16:9'
-export type PaletteId = 'mono' | 'copper' | 'blueprint' | 'phosphor'
+export type PaletteId = 'mono' | 'copper' | 'blueprint' | 'phosphor' | 'paper'
 
 export interface Palette {
   id: PaletteId | 'custom'
@@ -168,7 +168,7 @@ export interface GlyphTimeline extends TimelineBase {
 }
 
 export interface TraceTimeline extends TimelineBase {
-  style: 'trace'
+  style: 'trace' | 'plot'
   scene: TraceScene
 }
 
@@ -276,6 +276,31 @@ export interface TracePart {
   seat?: number | undefined
   /** an LED's light at power-on: its colour, and a gain that drops where LEDs crowd */
   led?: { color: string; gain: number } | undefined
+  /** the part's real body: an index into scene.meshes, drawn through m (local mm → px: x = m0·u + m2·v + m4, y = m1·u + m3·v + m5) */
+  mesh?: { id: number; m: [number, number, number, number, number, number] } | undefined
+}
+
+/**
+ * A part body tessellated from its 3D model, in footprint-local mm (y down,
+ * z up off the board), as base64 little-endian arrays.
+ */
+export interface PartMesh {
+  /** Float32 xyz per vertex */
+  pos: string
+  /** Int8 xyz per vertex, unit normal × 127 */
+  nor: string
+  /** Uint8 sRGB per vertex */
+  col: string
+  /** Uint32 triangle indices */
+  idx: string
+  min: [number, number, number]
+  max: [number, number, number]
+}
+
+/** real part bodies for a board: the meshes, and which footprint wears which */
+export interface PartBodies {
+  meshes: PartMesh[]
+  byRef: Record<string, number>
 }
 
 /** a screen-space caption pinned to a board point */
@@ -328,6 +353,7 @@ export interface TraceScene {
   shots: CameraShot[]
   acts: TraceActs
   parts: TracePart[]
+  meshes: PartMesh[]
   callouts: TraceCallout[]
 }
 

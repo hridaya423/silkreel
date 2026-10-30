@@ -1,28 +1,18 @@
 ---
 import Base from '../layouts/Base.astro'
 import Footer from '../components/Footer.astro'
-import Drawing from '../components/Drawing.astro'
 import Lettering from '../components/Lettering.astro'
-import Mark from '../components/Mark.astro'
-import { ASPECT_SIZE, PALETTES, TRACE_ACTS } from '@silk-reel/choreo'
-import { acts, aspects, boards, inks, site } from '../data/site'
+import { ASPECT_SIZE, PALETTES } from '@silk-reel/choreo'
+import { aspects, boards, inks, site } from '../data/site'
 import outlines from '../blueprint/outlines.json'
 import '../styles/home.css'
 
 const n = (v: number) => v.toLocaleString('en-US')
 const styles = [
   { id: 'glyph', text: 'Parts set as type' },
-  { id: 'trace', text: 'The lit board' }
+  { id: 'trace', text: 'The lit board' },
+  { id: 'plot', text: 'The board drawn in pen' }
 ] as const
-// each look's steps on its 24-beat score, as a chain of spans; a gap between two trace acts is a held pause
-const B = 24
-const beat = (t: number) => Math.round(t * B * 100) / 100
-const traceActs = Object.entries(TRACE_ACTS).map(([k, [a, b]]) => ({ k, a: beat(a), b: beat(b) })).sort((p, q) => p.a - q.a)
-const chain = (starts: { k: string; a: number }[]) => starts.map((s, i) => ({ ...s, b: starts[i + 1]?.a ?? B }))
-const score = {
-  trace: chain(traceActs.flatMap((s, i) => { const next = traceActs[i + 1]; return next && s.b < next.a ? [s, { k: 'wait', a: s.b }] : [s] })),
-  glyph: chain(acts.map((s) => ({ k: s.say, a: s.at })))
-}
 // the board picker draws each board's plan in a 2:1 box; its width dimension spans the drawn outline
 const plan = (id: string) => {
   const o = outlines[id as keyof typeof outlines]
@@ -36,14 +26,6 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
 ---
 <Base>
   <Fragment slot="world">
-    <canvas class="reel-gl" data-reel aria-hidden="true"></canvas>
-    <div class="load" data-load aria-hidden="true">
-      <i class="load__stock" data-load-stock></i>
-      <div class="load__core">
-        <Mark class="load__mark" />
-        <div class="load__strip" data-load-strip>{Array.from({ length: 8 }, () => <i></i>)}</div>
-      </div>
-    </div>
     <div class="drop" data-drop aria-hidden="true">
       <p class="drop__say"><Lettering text="Drop your board" align="middle" /></p>
       <p class="drop__note">Nothing leaves this tab.</p>
@@ -51,75 +33,46 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
     <div class="toast" data-toast role="status" aria-live="polite"></div>
   </Fragment>
 
-  <section class="hero" id="top" aria-labelledby="hero-title">
-    <div class="hero__reel" aria-hidden="true">
-      <picture>
-        <source media="(max-width: 760px)" srcset="/img/reel-phone.webp" />
-        <img class="hero__poster" src="/img/reel-desk.webp" alt="" width="2880" height="1800" fetchpriority="high" />
-      </picture>
-    </div>
-    <div class="hero__say">
-      <h1 id="hero-title" class="hero__title"><Lettering text={"A circuit board in.\nA film out."} weight={0.06} align="end" /></h1>
-      <p class="hero__lede">Give silk reel a KiCad board file. Get a release film of that board.</p>
-      <div class="hero__act">
-        <div class="term hero__cmd">
-          <code>{site.command}</code>
-          <button type="button" class="term__copy" data-copy={site.command} aria-label="Copy the command"><span data-copy-label data-roll>Copy</span></button>
+  <section class="cut" id="film" data-stage aria-label="The Glasgow board, as a pen plot and as a lit film">
+    <div class="cut__pin">
+      <canvas class="cut__gl" data-cut aria-hidden="true"></canvas>
+      <img class="cut__still" src="/films/cut/glasgow-16x9-poster.webp" alt="" width="1920" height="1080" fetchpriority="high" />
+      <video data-cut-video muted playsinline preload="none" hidden></video>
+
+      <div class="shot shot--hero" data-shot>
+        <h1 class="shot__title shot__title--xl"><Lettering text={"A circuit board in.\nA film out."} weight={0.055} /></h1>
+        <p class="shot__lede">Give silk reel a KiCad board file. Get a release film of that board.</p>
+        <div class="shot__acts">
+          <button type="button" class="setup" data-copy={site.setup}>
+            <span class="setup__p" aria-hidden="true">$</span><code class="setup__c">git clone {site.repo.replace('https://', '')}</code><span class="setup__k" data-copy-label data-roll>Copy</span>
+          </button>
         </div>
-        <a class="btn hero__open" href="/studio/">Open studio</a>
+        <p class="shot__src silk">Rendered from the Glasgow rev C3 .kicad_pcb</p>
       </div>
-    </div>
-  </section>
 
-  <section class="gate" id="film" aria-labelledby="gate-title" data-gate>
-    <div class="gate__pin">
-      <canvas class="gate__strip" data-strip aria-hidden="true"></canvas>
-      <div class="gate__box" aria-hidden="true"></div>
-      <svg class="gate__beam" data-beam aria-hidden="true"><defs><linearGradient id="beam-light" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0.95" /><stop offset="1" stop-color="#fff" stop-opacity="0.18" /></linearGradient></defs><polygon data-beam-poly /><line data-beam-a /><line data-beam-b /></svg>
-      <div class="gate__head">
-        <h2 id="gate-title" class="gate__title"><Lettering text={"Every frame,\nin your hands."} /></h2>
-        <p class="gate__body">Scroll to run the film one frame at a time.</p>
+      <div class="shot shot--frames" data-shot inert>
+        <h2 class="shot__title"><Lettering text="Every frame." weight={0.06} /></h2>
+        <p class="shot__lede">Scroll runs the film. Here in pen: every track drawn as it routes out of the board file.</p>
+        <div class="reel" aria-hidden="true">
+          <div class="reel__strip" data-strip><i class="reel__head" data-strip-head></i></div>
+          <p class="reel__tc silk" data-fn></p>
+        </div>
       </div>
-      <div class="gate__screen" data-screen tabindex="0" role="slider" aria-label="The iCEBreaker glyph film, frame in the gate" aria-valuemin="0" aria-valuemax="335" aria-valuenow="0" aria-valuetext="Frame 0 of 336" aria-keyshortcuts="Space ArrowLeft ArrowRight">
-        <canvas data-screen-film aria-hidden="true"></canvas>
-        <span class="gate__tc silk" aria-hidden="true" data-g-tc>00:00.00</span>
-      </div>
-    </div>
-  </section>
 
-  <Drawing />
-
-  <section class="looks" id="board" aria-labelledby="looks-title">
-    <div class="stock pos">
-      <div class="looks__head">
-        <h2 id="looks-title" class="looks__title"><Lettering text={"Two looks.\nOne board."} accent={1} weight={0.06} align="middle" /></h2>
-        <p class="looks__body">Pick a style. Each film is built from the same board file.</p>
+      <div class="shot shot--looks" data-shot inert>
+        <h2 class="shot__title"><Lettering text={"Three looks.\nOne board."} weight={0.06} /></h2>
+        <ol class="bands">
+          <li class="band band--plot"><span class="band__k">Plot</span><span class="band__t">The board drawn in pen</span></li>
+          <li class="band band--trace"><span class="band__k">Trace</span><span class="band__t">The lit board</span></li>
+          <li class="band band--glyph"><span class="band__k">Glyph</span><span class="band__t">Parts set as type</span></li>
+        </ol>
       </div>
-      <div class="looks__run">
-        <figure class="look" data-look="trace">
-          <figcaption class="look__k">Trace</figcaption>
-          <div class="look__frame">
-            <video data-look-video muted loop playsinline preload="none" poster="/films/trace/glasgow-poster.webp" width="1280" height="720" aria-label="The Glasgow trace film"><source src="/films/trace/glasgow-540.mp4" type="video/mp4" /></video>
-          </div>
-          <ol class="acts" data-acts aria-label="Steps of the trace film">{score.trace.map((s) => <li data-at={s.a} data-end={s.b} style={`flex:${s.b - s.a}`}><button type="button" class="dim" aria-label={`Play from ${s.k}`}>{s.k}</button></li>)}</ol>
-          <p class="look__say">The lit board under a camera, from bare copper to powered on.</p>
-        </figure>
-        <figure class="look" data-look="glyph">
-          <figcaption class="look__k">Glyph</figcaption>
-          <div class="look__frame">
-            <canvas data-look-film role="img" aria-label="The Glasgow glyph film"></canvas>
-          </div>
-          <ol class="acts" data-acts aria-label="Steps of the glyph film">{score.glyph.map((s) => <li data-at={s.a} data-end={s.b} style={`flex:${s.b - s.a}`}><button type="button" class="dim" aria-label={`Play from ${s.k}`}>{s.k}</button></li>)}</ol>
-          <p class="look__say">Every part of the board set as type, in a loop.</p>
-        </figure>
-      </div>
-      <p class="looks__credit silk">Glasgow rev C3 · Glasgow Embedded · 0BSD · iCEBreaker © 2019 1BitSquared · CC BY-SA 4.0</p>
     </div>
   </section>
 
   <section class="make" id="make" aria-labelledby="make-title">
     <div class="make__head">
-      <h2 id="make-title" class="make__title"><Lettering text="One command. Any board." weight={0.08} /></h2>
+      <h2 id="make-title" class="make__title"><Lettering text={"One command.\nYour board."} weight={0.07} /></h2>
       <p class="make__body">Change a word and the film below follows. Copy the line to render it on your machine.</p>
     </div>
     <div class="make__run">
@@ -127,25 +80,28 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
         <p class="cmd__line">
           <span class="cmd__p" aria-hidden="true">$</span>
           <span class="cmd__fixed">npm run reel --</span>
-          <button type="button" class="tok" popovertarget="pick-board" data-tok="board" aria-label="Board: icebreaker.kicad_pcb. Change the board"><span data-roll data-tok-v>icebreaker.kicad_pcb</span></button>
-          <button type="button" class="tok" popovertarget="pick-style" data-tok="style" aria-label="Style: glyph. Change the style"><span class="tok__f">--style</span> <span data-roll data-tok-v>glyph</span></button>
-          <button type="button" class="tok" popovertarget="pick-aspect" data-tok="aspect" aria-label="Aspect: 16:9. Change the aspect"><span class="tok__f">--aspect</span> <span data-roll data-tok-v>16:9</span></button>
-          <button type="button" class="tok" popovertarget="pick-palette" data-tok="palette" aria-label="Palette: mono. Change the palette"><span class="tok__f">--palette</span> <span data-roll data-tok-v>mono</span></button>
+          <button type="button" class="tok" popovertarget="pick-board" data-tok="board"><span data-roll data-tok-v>icebreaker.kicad_pcb</span><span class="sr-only">, change the board</span></button>
+          <button type="button" class="tok" popovertarget="pick-style" data-tok="style"><span class="tok__f">--style</span> <span data-roll data-tok-v>trace</span><span class="sr-only">, change the style</span></button>
+          <button type="button" class="tok" popovertarget="pick-aspect" data-tok="aspect"><span class="tok__f">--aspect</span> <span data-roll data-tok-v>16:9</span><span class="sr-only">, change the aspect</span></button>
+          <button type="button" class="tok" popovertarget="pick-palette" data-tok="palette" hidden><span class="tok__f">--palette</span> <span data-roll data-tok-v>mono</span><span class="sr-only">, change the palette</span></button>
         </p>
         <div class="cmd__acts">
           <button type="button" class="btn btn--solid" data-copy={site.command} data-cmd-copy><span data-copy-label data-roll>Copy the command</span></button>
           <a class="btn" href="/studio/">Open studio</a>
         </div>
+        <p class="cmd__once">Runs from a clone of the repo. First time: <button type="button" class="cmd__setup" data-copy={site.setup}><code>{site.setup}</code><span class="cmd__setup-k" data-copy-label data-roll>Copy</span></button></p>
       </div>
       <div class="monitor" data-monitor>
         <div class="monitor__stage" data-monitor-stage>
-          <canvas data-monitor-film role="img" aria-label="The film for the command"></canvas>
-          <video data-monitor-video muted loop playsinline preload="none" aria-label="The trace film for the command" hidden></video>
+          <canvas data-monitor-film role="img" aria-label="The film for the command" hidden></canvas>
+          <video data-monitor-video muted loop playsinline preload="none" poster="/films/trace/icebreaker-poster.webp" aria-label="The trace film for the command"></video>
+          <canvas data-monitor-plot role="img" aria-label="The plot film for the command" hidden></canvas>
           <span class="dim dim--w" data-dim-w>{ASPECT_SIZE['16:9'].width} px</span>
           <span class="dim dim--h" data-dim-h>{ASPECT_SIZE['16:9'].height} px</span>
         </div>
         <div class="monitor__foot">
           <p class="monitor__note" data-monitor-note hidden></p>
+          <p class="monitor__credit" data-monitor-credit>{`${boards[0]?.name}, ${boards[0]?.maker}`}</p>
           <p class="monitor__tc silk" aria-hidden="true" data-monitor-tc>00:00.00</p>
         </div>
       </div>
@@ -165,8 +121,8 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
     </div>
     <div class="pick" id="pick-style" popover data-pick="style">
       <div class="pick__list" role="menu" aria-label="Style">
-        {styles.map((s, i) => (
-          <button type="button" role="menuitemradio" class="pick__o" data-v={s.id} aria-checked={i === 0 ? 'true' : 'false'}><span>{s.id}</span><span class="silk">{s.text}</span></button>
+        {styles.map((s) => (
+          <button type="button" role="menuitemradio" class="pick__o" data-v={s.id} aria-checked={s.id === 'trace' ? 'true' : 'false'}><span>{s.id}</span><span class="silk">{s.text}</span></button>
         ))}
       </div>
     </div>
@@ -192,6 +148,7 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
     </div>
   </section>
   <input class="sr-only" type="file" accept=".kicad_pcb" tabindex="-1" aria-hidden="true" data-file />
+
 
   <Footer slot="footer" />
 </Base>

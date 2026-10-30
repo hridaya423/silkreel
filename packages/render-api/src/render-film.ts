@@ -122,8 +122,8 @@ export async function renderFilm(options: RenderFilmOptions): Promise<RenderFilm
   }
   if (format === 'mp4') await normalizeMp4(options.outputLocation)
   const timeline = options.inputProps.timeline
-  if (format !== 'gif' && timeline.style === 'trace' && options.audio !== false) await muxScore(options.outputLocation, format, timeline)
-  if (options.poster !== true || timeline.style !== 'trace') return { bundleLocation, outputLocation: options.outputLocation }
+  if (format !== 'gif' && timeline.style !== 'glyph' && options.audio !== false) await muxScore(options.outputLocation, format, timeline)
+  if (options.poster !== true || timeline.style === 'glyph') return { bundleLocation, outputLocation: options.outputLocation }
   const posterLocation = options.outputLocation.replace(/\.[^./\\]*$/, '') + '.poster.png'
   await renderStill({ composition, serveUrl: bundleLocation, inputProps, frame: timeline.totalFrames - 1, output: posterLocation, imageFormat: 'png', chromiumOptions })
   return { bundleLocation, outputLocation: options.outputLocation, posterLocation }

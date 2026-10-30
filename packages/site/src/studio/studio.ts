@@ -50,8 +50,8 @@ export function setupStudio() {
   const q = new URLSearchParams(location.search)
   const sample = boards.find((b) => b.id === q.get('board'))
   const state: State = {
-    board: sample?.id ?? 'icebreaker',
-    style: q.get('style') === 'trace' ? 'trace' : 'glyph',
+    board: sample?.id ?? 'glasgow',
+    style: q.get('style') === 'trace' ? 'trace' : q.get('style') === 'glyph' ? 'glyph' : 'plot',
     aspect: (['4:5', '1:1', '9:16', '16:9'] as const).find((a) => a === q.get('aspect')) ?? '16:9',
     palette: (['mono', 'copper', 'blueprint', 'phosphor'] as const).find((p) => p === q.get('palette')) ?? 'mono',
     accent: /^#[0-9a-f]{6}$/i.test(q.get('accent') ?? '') ? q.get('accent') ?? ACCENT : ACCENT,
@@ -322,11 +322,11 @@ export function setupStudio() {
   })
   playBtn?.addEventListener('click', () => { setPlaying(!playing) })
 
-  /* ---------- source: nothing loaded yet shows the drop zone, then a slim bar ---------- */
+  /* ---------- source: a sample plays from the start; the drop zone returns only if the visitor's own board fails ---------- */
   const film = $('[data-film]', root)
   const sampleSel = root.querySelector<HTMLSelectElement>('[data-sample]')
   const wide = matchMedia('(min-width: 961px)')
-  let mode: 'empty' | 'ready' = sample ? 'ready' : 'empty'
+  let mode: 'empty' | 'ready' = 'ready'
   const paintSample = () => { if (sampleSel) sampleSel.value = mode === 'empty' ? '' : state.board }
   const setMode = (m: 'empty' | 'ready') => {
     mode = m
@@ -383,6 +383,7 @@ export function setupStudio() {
   const liveNote = $('[data-live-note]', root)
   const paletteName = $('[data-palette-name]', root)
   const aspectUse = $('[data-aspect-use]', root)
+  const lookUse = $('[data-look-use]', root)
   const titleIn = root.querySelector<HTMLInputElement>('[data-title]')
   /** the hero and mask pickers name this board's own parts and colour */
   const heroSel = root.querySelector<HTMLSelectElement>('[name="hero"]')
@@ -413,6 +414,7 @@ export function setupStudio() {
       liveNote.textContent = 'A draft preview. The full trace film, with its sound, renders on your machine.'
     }
     if (paletteName) paletteName.textContent = cap(state.palette)
+    if (lookUse) lookUse.textContent = root.querySelector(`[name="style"][value="${state.style}"] ~ .st__look-t`)?.textContent ?? ''
     if (aspectUse) aspectUse.textContent = aspects.find((a) => a.id === state.aspect)?.use ?? ''
     if (titleIn) titleIn.placeholder = boardName()
     paintSample()

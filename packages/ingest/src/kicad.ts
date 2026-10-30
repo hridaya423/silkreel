@@ -6,6 +6,7 @@ import type {
   IngestWarning,
   Layer,
   LayerSide,
+  ModelRef,
   Net,
   NetNodeRef,
   Pad,
@@ -15,6 +16,7 @@ import type {
   Stackup,
   Trace,
   Vec2,
+  Vec3,
   Via,
   Zone
 } from './types.js'
@@ -228,6 +230,10 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
   const layerOf = (node: SExprNode[], fallback: string): string => {
     const id = atomsAfterHead(node)[0] ?? fallback
     return layerAlias.get(id) ?? id
+  }
+  const onEdge = (node: SExprNode[]): boolean => {
+    const layerNode = firstListNamed(node, 'layer')
+    return layerNode !== undefined && layerOf(layerNode, '') === 'Edge.Cuts'
   }
 
   function copperFor(layerId: string): CopperLayers {
@@ -450,6 +456,8 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       const lineId = `sl:${nextId(ids)}`
       silkFor(layerId).lines.push({ id: lineId, points: pts, width })
       fp.silkRefs.push(lineId)
+    } else if (layerId === 'Edge.Cuts') {
+      outline.push({ id: `o:${nextId(ids)}`, points: pts, closed: false, layerId })
     }
     for (const p of pts) bbox.point(p)
   }
@@ -461,12 +469,13 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     if (!startNode || !midNode || !endNode) return
     const layerNode = firstListNamed(node, 'layer')
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.SilkS') : 'F.SilkS'
+    const approx = approximateArc(parseXY(startNode, fileName), parseXY(midNode, fileName), parseXY(endNode, fileName))
+    const shifted = approx.map((p) => rotatePoint({ x: fpOrigin.x + p.x, y: fpOrigin.y + p.y }, fpOrigin, fpRot))
+    if (layerId === 'Edge.Cuts') outline.push({ id: `o:${nextId(ids)}`, points: shifted, closed: false, layerId })
     if (!/\.SilkS$/.test(layerId)) return
     const strokeNode = firstListNamed(node, 'stroke')
     const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_arc width') : 0.12
-    const approx = approximateArc(parseXY(startNode, fileName), parseXY(midNode, fileName), parseXY(endNode, fileName))
-    const shifted = approx.map((p) => rotatePoint({ x: fpOrigin.x + p.x, y: fpOrigin.y + p.y }, fpOrigin, fpRot))
     const arcId = `sa:${nextId(ids)}`
     ensureLayer(layerId)
     silkFor(layerId).lines.push({ id: arcId, points: shifted, width })
@@ -544,7 +553,8 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       layer: fpLayer,
       padRefs: [],
       silkRefs: [],
-      model: modelName(fpNode)
+      model: modelName(fpNode),
+      models: modelRefs(fpNode, fileName)
     }
     footprintNodeById.set(ref, fpNode)
     for (const child of children(fpNode)) {
@@ -557,6 +567,11 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       else if (h === 'fp_text') collectFpText(fp, fpOrigin, fpRot, child, 'fp_text')
       else if (h === 'property') collectFpText(fp, fpOrigin, fpRot, child, 'property')
       else if (h === 'fp_poly' || h === 'fp_rect') collectFpPolyOrRect(fp, fpOrigin, fpRot, child, h)
+      else if (h === 'fp_curve' && onEdge(child)) {
+        const pts = bezierOf(child, fileName).map((p) => rotatePoint({ x: fpOrigin.x + p.x, y: fpOrigin.y + p.y }, fpOrigin, fpRot))
+        outline.push({ id: `o:${nextId(ids)}`, points: pts, closed: false, layerId: 'Edge.Cuts' })
+        for (const p of pts) bbox.point(p)
+      }
     }
     footprints.push(fp)
     bbox.point(fpOrigin)
@@ -580,6 +595,8 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       const circleId = `sc:${nextId(ids)}`
       silkFor(layerId).lines.push({ id: circleId, points: approximateFullCircle(center, radius), width })
       fp.silkRefs.push(circleId)
+    } else if (layerId === 'Edge.Cuts') {
+      outline.push({ id: `o:${nextId(ids)}`, points: approximateFullCircle(center, radius), closed: true, layerId })
     }
     bbox.radius(center, radius)
   }
@@ -593,7 +610,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
   ): void {
     const layerNode = firstListNamed(node, 'layer')
     const layerId = layerNode ? (atomsAfterHead(layerNode)[0] ?? 'F.SilkS') : 'F.SilkS'
-    if (!/\.SilkS$/.test(layerId)) return
+    if (!/\.SilkS$/.test(layerId) && layerId !== 'Edge.Cuts') return
     const strokeNode = firstListNamed(node, 'stroke')
     const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_poly width') : 0.12
@@ -612,6 +629,11 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     }
     if (localPts.length < 2) return
     const globalPts = localPts.map((p) => rotatePoint({ x: fpOrigin.x + p.x, y: fpOrigin.y + p.y }, fpOrigin, fpRot))
+    if (layerId === 'Edge.Cuts') {
+      outline.push({ id: `o:${nextId(ids)}`, points: globalPts, closed: globalPts.length > 2, layerId })
+      for (const p of globalPts) bbox.point(p)
+      return
+    }
     const polyId = `${h === 'fp_rect' ? 'sr' : 'sp'}:${nextId(ids)}`
     ensureLayer(layerId)
     silkFor(layerId).lines.push({ id: polyId, points: [...globalPts, globalPts[0] as Vec2], width })
@@ -702,6 +724,25 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       silkFor(layerId).lines.push({ id: `sl:${nextId(ids)}`, points: approx, width })
     }
     for (const p of approx) bbox.point(p)
+  }
+
+  for (const gc of listsNamed(root, 'gr_curve')) {
+    if (!onEdge(gc)) continue
+    const pts = bezierOf(gc, fileName)
+    if (pts.length < 2) continue
+    outline.push({ id: `o:${nextId(ids)}`, points: pts, closed: false, layerId: 'Edge.Cuts' })
+    for (const p of pts) bbox.point(p)
+  }
+
+  for (const gc of listsNamed(root, 'gr_circle')) {
+    const centerNode = firstListNamed(gc, 'center')
+    const endNode = firstListNamed(gc, 'end')
+    if (!centerNode || !endNode || !onEdge(gc)) continue
+    const center = parseXY(centerNode, fileName)
+    const end = parseXY(endNode, fileName)
+    const radius = Math.hypot(end.x - center.x, end.y - center.y)
+    outline.push({ id: `o:${nextId(ids)}`, points: approximateFullCircle(center, radius), closed: true, layerId: 'Edge.Cuts' })
+    bbox.radius(center, radius)
   }
 
   if (layersDecl) {
@@ -872,6 +913,23 @@ function approximateArc(a: Vec2, m: Vec2, b: Vec2): Vec2[] {
   return out
 }
 
+function bezierOf(node: SExprNode[], fileName: string): Vec2[] {
+  const ptsNode = firstListNamed(node, 'pts')
+  const ctrl = ptsNode ? listsNamed(ptsNode, 'xy').map((xy) => parseXY(xy, fileName)) : []
+  if (ctrl.length !== 4) return ctrl
+  const [a, b, c, d] = ctrl as [Vec2, Vec2, Vec2, Vec2]
+  const hull = Math.hypot(b.x - a.x, b.y - a.y) + Math.hypot(c.x - b.x, c.y - b.y) + Math.hypot(d.x - c.x, d.y - c.y)
+  const steps = Math.min(96, Math.max(2, Math.ceil(hull / MAX_SEGMENT)))
+  const out: Vec2[] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const u = 1 - t
+    const k = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t] as const
+    out.push({ x: k[0] * a.x + k[1] * b.x + k[2] * c.x + k[3] * d.x, y: k[0] * a.y + k[1] * b.y + k[2] * c.y + k[3] * d.y })
+  }
+  return out
+}
+
 function approximateFullCircle(c: Vec2, r: number): Vec2[] {
   const safeR = r > 0 ? r : 0.01
   const steps = Math.min(96, Math.max(8, Math.ceil((2 * Math.PI * safeR) / MAX_SEGMENT)))
@@ -881,6 +939,22 @@ function approximateFullCircle(c: Vec2, r: number): Vec2[] {
     out.push({ x: c.x + safeR * Math.cos(t), y: c.y + safeR * Math.sin(t) })
   }
   return out
+}
+
+function modelRefs(fpNode: SExprNode[], fileName: string): ModelRef[] {
+  return listsNamed(fpNode, 'model').flatMap((model) => {
+    const path = atomsAfterHead(model)[0]
+    const hidden = atomsAfterHead(model).includes('hide') || atomsAfterHead(firstListNamed(model, 'hide') ?? [])[0] === 'yes'
+    if (path === undefined || hidden) return []
+    const xyz = (name: string, fallback: number, unit = 1): Vec3 => {
+      const node = firstListNamed(firstListNamed(model, name) ?? [], 'xyz')
+      const [x, y, z] = node ? atomsAfterHead(node).map((a) => toNumber(a, fileName, `model ${name}`) * unit) : []
+      return { x: x ?? fallback, y: y ?? fallback, z: z ?? fallback }
+    }
+    // KiCad 5 and older wrote the offset as (at) in inches
+    const offset = firstListNamed(model, 'offset') ? xyz('offset', 0) : xyz('at', 0, 25.4)
+    return [{ path, offset, scale: xyz('scale', 1), rotate: xyz('rotate', 0) }]
+  })
 }
 
 function modelName(fpNode: SExprNode[]): string | undefined {

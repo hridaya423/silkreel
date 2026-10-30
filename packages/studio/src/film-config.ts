@@ -24,7 +24,8 @@ export const KNOB_RANGES = {
 
 export const STYLES: ReadonlyArray<{ id: StyleId; label: string }> = [
   { id: 'trace', label: 'Trace Growth' },
-  { id: 'glyph', label: 'Glyph Loop' }
+  { id: 'glyph', label: 'Glyph Loop' },
+  { id: 'plot', label: 'Plot' }
 ]
 export const ASPECTS = Object.keys(ASPECT_SIZE) as Aspect[]
 export const PALETTE_LIST: readonly Palette[] = Object.values(PALETTES)

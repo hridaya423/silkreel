@@ -1,5 +1,7 @@
 ---
 import Mark from './Mark.astro'
+import { site } from '../data/site'
+import { stars } from '../data/stars'
 const path = Astro.url.pathname
 const home = path === '/'
 const links = [
@@ -19,6 +21,10 @@ const links = [
     ))}
   </nav>
   <div class="hd__end">
+    <a class="hd__gh" href={site.repo}>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <span class="sr-only">GitHub, </span>{stars !== null && <span class="hd__stars"><svg class="hd__star" viewBox="0 0 16 16" aria-hidden="true"><path class="hd__star-a" d="M8 8.5L8.0 1.3L9.76 6.07ZM8 8.5L14.85 6.28L10.85 9.43ZM8 8.5L12.23 14.32L8.0 11.5ZM8 8.5L3.77 14.32L5.15 9.43ZM8 8.5L1.15 6.28L6.24 6.07Z" /><path class="hd__star-b" d="M8 8.5L9.76 6.07L14.85 6.28ZM8 8.5L10.85 9.43L12.23 14.32ZM8 8.5L8.0 11.5L3.77 14.32ZM8 8.5L5.15 9.43L1.15 6.28ZM8 8.5L6.24 6.07L8.0 1.3Z" /><path class="hd__star-r" d="M8 8.5L8.0 1.3M8 8.5L9.76 6.07M8 8.5L14.85 6.28M8 8.5L10.85 9.43M8 8.5L12.23 14.32M8 8.5L8.0 11.5M8 8.5L3.77 14.32M8 8.5L5.15 9.43M8 8.5L1.15 6.28M8 8.5L6.24 6.07" /><path class="hd__star-o" d="M8.0 1.3L9.76 6.07L14.85 6.28L10.85 9.43L12.23 14.32L8.0 11.5L3.77 14.32L5.15 9.43L1.15 6.28L6.24 6.07Z" /></svg>{stars.toLocaleString('en-US')}<span class="sr-only"> stars</span></span>}
+    </a>
     {path.startsWith('/studio')
       ? <a class="btn btn--solid hd__cta" href="/docs/#install">Get the CLI</a>
       : <a class="btn btn--solid hd__cta" href="/studio/">Open studio</a>}
@@ -48,15 +54,34 @@ const links = [
   .hd__nav { display: flex; gap: 4px; }
   .hd__nav a {
     position: relative; display: inline-flex; align-items: center; height: 44px; padding: 0 12px;
-    font-size: 0.9375rem; font-weight: 500; color: var(--c-muted); transition: color var(--t2) var(--soft);
+    font-size: 1rem; font-weight: 500; color: var(--c-muted); transition: color var(--t2) var(--soft);
   }
   .hd__nav a::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 8px; height: 2px; border-radius: 1px; background: var(--c-red); scale: 0 1; transform-origin: 0 50%; transition: scale var(--t3) var(--soft); }
   .hd__nav a:hover, .hd__nav a[aria-current] { color: var(--c-ink); }
   .hd__nav a[aria-current]::after { scale: 1 1; }
   .hd__nav a:focus-visible { outline: 2px solid var(--c-ink); outline-offset: -6px; color: var(--c-ink); }
 
-  .hd__end { justify-self: end; display: flex; align-items: center; }
-  .hd__cta { --h: 38px; padding: 0 14px; font-size: 0.875rem; }
+  .hd__end { justify-self: end; display: flex; align-items: center; gap: 8px; }
+  .hd__cta { --h: 40px; padding: 0 16px; font-size: 0.9375rem; }
+  .hd__gh { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--c-line-2); font-size: 0.9375rem; font-weight: 500; color: var(--c-ink); transition: background-color var(--t2) var(--soft), box-shadow var(--t2) var(--soft), scale var(--t1) var(--soft); }
+  .hd__gh > svg { width: 16px; height: 16px; fill: currentColor; }
+  .hd__stars { display: inline-flex; align-items: center; gap: 6px; padding-left: 10px; border-left: 1px solid var(--c-line-2); color: var(--c-muted); font-variant-numeric: tabular-nums; transition: color var(--t2) var(--soft); }
+  .hd__star { width: 15px; height: 15px; overflow: visible; transform-origin: 50% 53%; transition: rotate var(--t3) var(--soft); }
+  .hd__star path { fill: none; stroke: currentColor; stroke-linejoin: round; stroke-linecap: round; }
+  .hd__star-o { stroke-width: 1.1; }
+  .hd__star-r { stroke-width: 0.55; opacity: 0.7; }
+  .hd__star .hd__star-a, .hd__star .hd__star-b { stroke: none; fill: currentColor; transition: opacity var(--t3) var(--soft); }
+  .hd__star-a { opacity: 0; }
+  .hd__star-b { opacity: 0.28; }
+  @media (hover: hover) {
+    .hd__gh:hover { background: rgb(var(--ink-rgb) / 0.06); box-shadow: inset 0 0 0 1px var(--c-ink); }
+    .hd__gh:hover .hd__stars { color: var(--c-ink); }
+    .hd__gh:hover .hd__star { rotate: 72deg; }
+    .hd__gh:hover .hd__star-a { opacity: 0.85; }
+    .hd__gh:hover .hd__star-b { opacity: 0.2; }
+  }
+  .hd__gh:active { scale: 0.97; }
+  .hd__gh:focus-visible { outline: 2px solid var(--c-ink); outline-offset: 2px; }
 
   /* a phone: the name, the three links; the Studio link does the call to action's job */
   @media (max-width: 760px) {

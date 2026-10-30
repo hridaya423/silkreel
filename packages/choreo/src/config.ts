@@ -59,8 +59,8 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     throw new ChoreoConfigError('config', config, 'expected a FilmConfig object')
   }
   const styleRaw: unknown = config.style
-  if (styleRaw !== undefined && styleRaw !== 'trace' && styleRaw !== 'glyph') {
-    throw new ChoreoConfigError('style', styleRaw, "expected 'trace' or 'glyph'")
+  if (styleRaw !== undefined && styleRaw !== 'trace' && styleRaw !== 'glyph' && styleRaw !== 'plot') {
+    throw new ChoreoConfigError('style', styleRaw, "expected 'trace', 'glyph' or 'plot'")
   }
   const style: StyleId = styleRaw ?? 'trace'
 
@@ -72,7 +72,7 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
 
   const paletteIdRaw: unknown = config.palette
   if (paletteIdRaw !== undefined && !Object.hasOwn(PALETTES, paletteIdRaw as string)) {
-    throw new ChoreoConfigError('palette', paletteIdRaw, "expected 'mono', 'copper', 'blueprint' or 'phosphor'")
+    throw new ChoreoConfigError('palette', paletteIdRaw, "expected 'mono', 'copper', 'blueprint', 'phosphor' or 'paper'")
   }
 
   if (config.accent !== undefined && !/^#[0-9a-fA-F]{6}$/.test(config.accent)) {

@@ -3,7 +3,7 @@ import { fitBoard, safeArea } from '../layout'
 import type { ResolvedConfig } from '../config'
 import type {
   CameraKey, CameraShot, FlatPath, TraceActs, TraceBeats, TraceCallout, TraceGroup, TraceLayer, TraceMaterial,
-  TracePad, TracePart, TraceScene, TraceText, TraceVia, TraceZone, TimelineWarning
+  PartBodies, PartMesh, TracePad, TracePart, TraceScene, TraceText, TraceVia, TraceZone, TimelineWarning
 } from '../types'
 import { makeRng } from '../rng'
 import { fitZoom } from './camera'
@@ -130,7 +130,7 @@ function contentBox(board: BoardModel): BBox {
   return { min, max }
 }
 
-export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, seed: number): { scene: TraceScene; warnings: TimelineWarning[] } {
+export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, seed: number, bodies?: PartBodies): { scene: TraceScene; warnings: TimelineWarning[] } {
   const beats = TRACE_BEATS
   const acts = TRACE_ACTS
   const box = contentBox(board)
@@ -419,18 +419,43 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const [rf0, rf1] = acts.reflow
   const prng = makeRng(seed, 'trace-paste')
   const leds = partsMm.filter((pt) => pt.kind === 'led')
+  const footprintOf = new Map(board.footprints.map((fp) => [fp.ref, fp]))
+  const meshes: PartMesh[] = []
+  const meshIds = new Map<number, number>()
   const parts: TracePart[] = partsMm.flatMap((pt, i) => {
-    const m = map(pt.pos)
     const isHero = pt === heroPart
     const label = pt.kind === 'ic' && pt.value !== undefined ? pt.value.replace(/_/g, '-').toUpperCase().slice(0, 22) : undefined
-    const w = pt.w * fit.scale
-    const h = pt.h * fit.scale
+    const fp = footprintOf.get(pt.ref)
+    const source = bodies?.byRef[pt.ref]
+    const mesh = fp === undefined || source === undefined ? undefined : bodies?.meshes[source]
+    let m = map(pt.pos)
+    let w = pt.w * fit.scale
+    let h = pt.h * fit.scale
+    let z = pt.z * fit.scale
+    let solid: TracePart['mesh']
+    if (fp !== undefined && mesh !== undefined) {
+      const a = (-fp.rot * Math.PI) / 180
+      const at = (u: number, v: number): Vec2 => map({ x: fp.pos.x + u * Math.cos(a) - v * Math.sin(a), y: fp.pos.y + u * Math.sin(a) + v * Math.cos(a) })
+      const o = at(0, 0)
+      const du = at(1, 0)
+      const dv = at(0, 1)
+      const affine: [number, number, number, number, number, number] = [du.x - o.x, du.y - o.y, dv.x - o.x, dv.y - o.y, o.x, o.y]
+      const [x0, y0] = mesh.min
+      const [x1, y1, z1] = mesh.max
+      m = at((x0 + x1) / 2, (y0 + y1) / 2)
+      w = (x1 - x0) * fit.scale
+      h = (y1 - y0) * fit.scale
+      z = Math.max(0.05, z1) * fit.scale
+      const id = meshIds.get(source as number) ?? meshes.push(mesh) - 1
+      meshIds.set(source as number, id)
+      solid = { id, m: affine }
+    }
     const off = (isHero ? 0.05 : 0.14) * Math.min(w, h)
     const t = isHero ? pl0 + 0.75 * B : pl0 + 1.5 * B + (rankOf.get(i) ?? 0) * (pl1 - pl0 - 1.5 * B)
     const settle = rf0 + Math.min(1, Math.max(0, (m.x - bx0) / Math.max(1, bx1 - bx0))) * (rf1 - rf0 - 0.5 * B)
     const skew: [number, number, number] = [prng.range(-off, off), prng.range(-off, off), prng.range(-1, 1) * (isHero ? 1.5 : 5) * DEG]
     const body: TracePart = {
-      x: m.x, y: m.y, w, h, rot: rotOf(pt.rot), z: pt.z * fit.scale,
+      x: m.x, y: m.y, w, h, rot: rotOf(pt.rot), z,
       kind: pt.kind,
       t,
       settle,
@@ -439,10 +464,11 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       label,
       pitch: pt.kind === 'conn' && pt.pitch > 0 ? pt.pitch * fit.scale : undefined,
       led: pt.kind === 'led' ? ledLight(pt, leds) : undefined,
-      hero: isHero
+      hero: isHero,
+      mesh: solid
     }
     const pinW = 0.64 * (pt.pinZ ?? 0) / 8.5 * fit.scale
-    return [body, ...(pt.pins ?? []).map((pin): TracePart => ({
+    return [body, ...(solid === undefined ? pt.pins ?? [] : []).map((pin): TracePart => ({
       ...map(pin), w: pinW, h: pinW, rot: body.rot, z: (pt.pinZ ?? 0) * fit.scale, kind: 'pin', t, settle, skew: [0, 0, 0], seat: body.z
     }))]
   })
@@ -479,6 +505,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       }),
       acts,
       parts,
+      meshes,
       callouts
     },
     warnings
@@ -612,9 +639,15 @@ function boardLoops(board: BoardModel): Vec2[][] {
     }
     if (chain.length >= 3 && near(chain[0] as Vec2, chain[chain.length - 1] as Vec2)) loops.push(chain)
   }
-  if (loops.length > 0) return loops
   const { min, max } = board.bbox
-  return [[min, { x: max.x, y: min.y }, max, { x: min.x, y: max.y }]]
+  const rect = [min, { x: max.x, y: min.y }, max, { x: min.x, y: max.y }]
+  const span = (pts: Vec2[]): number => {
+    const xs = pts.map((p) => p.x)
+    const ys = pts.map((p) => p.y)
+    return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
+  }
+  const outer = loops.length > 0 && Math.max(...loops.map(span)) > 0.5 * span(rect)
+  return outer ? loops : [rect, ...loops]
 }
 
 /** the board's own mask and finish under the copper palette; the stylised palettes tint them */

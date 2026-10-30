@@ -4,9 +4,18 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseKicadPcb } from '@silk-reel/ingest'
 import { extractParts } from '../../choreo/src/trace/parts'
-import { boxOf } from '../src/blueprint/draw'
 import { boards } from '../src/data/site'
 
+const boxOf = (p: { x: number; y: number; w: number; h: number; rot: number }) => {
+  const a = (-p.rot * Math.PI) / 180
+  const c = Math.cos(a)
+  const s = Math.sin(a)
+  return ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([u, v]) => {
+    const x = (u * p.w) / 2
+    const y = (v * p.h) / 2
+    return { x: p.x + x * c - y * s, y: p.y + x * s + y * c }
+  })
+}
 const r = (n: number) => Math.round(n * 10) / 10
 const out = Object.fromEntries(boards.map((info) => {
   const board = parseKicadPcb(readFileSync(`fixtures/boards/${info.id}.kicad_pcb`, 'utf8'), info.id)

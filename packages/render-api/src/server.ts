@@ -16,9 +16,9 @@ const allowedVideoRoots = [path.join(repoRoot, 'exports'), path.join(repoRoot, '
 const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'transparent', 'hero', 'mask'] as const
 const CAST_KEYS = ['preferRefs', 'preferTexts'] as const
 const KNOB_KEYS = ['texts', 'tempo'] as const
-const STYLE_IDS: readonly StyleId[] = ['trace', 'glyph']
+const STYLE_IDS: readonly StyleId[] = ['trace', 'glyph', 'plot']
 const ASPECT_IDS: readonly Aspect[] = ['4:5', '1:1', '9:16', '16:9']
-const PALETTE_IDS: readonly PaletteId[] = ['mono', 'copper', 'blueprint', 'phosphor']
+const PALETTE_IDS: readonly PaletteId[] = ['mono', 'copper', 'blueprint', 'phosphor', 'paper']
 const OUTPUT_KEYS = ['width', 'height', 'fps'] as const
 const DEFAULT_OUTPUT = defaultFilmConfig().output
 

@@ -60,8 +60,6 @@ const jsonLd = {
         h.classList.add('js')
         if (window.WebGL2RenderingContext) h.classList.add('gl')
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) h.classList.add('motion')
-        // the countdown belongs to a first arrival at home; any other page counts as having arrived
-        try { if (sessionStorage.getItem('sr-seen') === '1') h.classList.add('seen'); else if (location.pathname !== '/') sessionStorage.setItem('sr-seen', '1') } catch (e) {}
         // a page transition the browser abandons (a fast second click, a back swipe) is not an error
         var hush = function (e) { var v = e.viewTransition; if (v) [v.ready, v.finished, v.updateCallbackDone].forEach(function (p) { p.catch(function () {}) }) }
         addEventListener('pageswap', hush)

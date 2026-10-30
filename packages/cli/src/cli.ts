@@ -3,7 +3,7 @@ import { mkdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { parseKicadPcb } from '@silk-reel/ingest'
 import { compileTimeline } from '@silk-reel/choreo'
-import { renderFilm } from '@silk-reel/render-api'
+import { loadPartBodies, renderFilm } from '@silk-reel/render-api'
 import { HELP, parseCliArgs } from './args.js'
 
 async function readBoard(input: string): Promise<string> {
@@ -17,7 +17,7 @@ async function readBoard(input: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { input, out, config, format, draft, audio, help } = parseCliArgs(process.argv.slice(2))
+  const { input, out, config, format, draft, audio, models, help } = parseCliArgs(process.argv.slice(2))
   if (help) {
     console.log(HELP)
     return
@@ -28,7 +28,14 @@ async function main(): Promise<void> {
     throw new Error(`Cannot write to ${path.dirname(outputLocation)}. Choose another -o path.`)
   })
   const board = parseKicadPcb(text, path.basename(input))
-  const timeline = compileTimeline(board, config)
+  const loaded = models === undefined || config.style !== 'trace' ? undefined : await loadPartBodies(board, { boardDir: path.dirname(path.resolve(input)), dirs: models })
+  if (loaded !== undefined) {
+    const n = Object.keys(loaded.bodies.byRef).length
+    console.log(`${n} of ${board.footprints.length} parts wear their own 3D model`)
+    if (loaded.missing.length > 0) console.warn(`warning: ${loaded.missing.length} model files not found (add a folder with --models): ${loaded.missing.slice(0, 3).join(', ')}${loaded.missing.length > 3 ? ', …' : ''}`)
+    if (loaded.misplaced.length > 0) console.warn(`warning: the models of ${loaded.misplaced.join(', ')} do not sit on their pads; those parts keep estimated bodies`)
+  }
+  const timeline = compileTimeline(board, config, loaded?.bodies)
   for (const w of timeline.warnings) console.warn(`warning: ${w.message}`)
   console.log(`${timeline.style} ${timeline.width}x${timeline.height} ${timeline.totalFrames}f @${timeline.fps}fps -> ${format}`)
   const live = process.stdout.isTTY

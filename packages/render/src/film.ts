@@ -1,5 +1,7 @@
 import { blinkAlpha, decodeAlpha, flareTone, safeArea } from '@silk-reel/choreo'
 import type { AtomState, GlyphLabel, GlyphTimeline, Timeline } from '@silk-reel/choreo'
+import { drawPlotFrame } from './plot-draw'
+export { drawPlotFrame }
 import { drawTraceFrame } from './trace-draw'
 import { drawTitle } from './title'
 import { FONT } from './font'
@@ -89,25 +91,26 @@ export function drawFrame(
   scene: Scene,
   frame: number
 ): number {
-  if (timeline.style === 'trace') return drawTraceFrame(ctx, timeline, frame)
+  if (timeline.style === 'plot') return drawPlotFrame(ctx, timeline, frame)
+  if (timeline.style !== 'glyph') return drawTraceFrame(ctx, timeline, frame)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.fillStyle = timeline.palette.bg
   ctx.fillRect(0, 0, timeline.width, timeline.height)
   return drawGlyphFrame(ctx, timeline, scene, frame)
 }
 
-/** post-pass settings per style — the glyph look is flat: no bloom, no vignette */
+/** post-pass settings per style — glyph and plot are flat: no bloom, no vignette */
 export function postOptionsFor(timeline: Timeline, grain = true): {
   bloom: number
   grain: boolean
   vignette: boolean
   transparent: boolean
 } {
-  const glyph = timeline.style === 'glyph'
+  const flat = timeline.style !== 'trace'
   return {
-    bloom: glyph ? 0 : timeline.palette.bloom,
+    bloom: flat ? 0 : timeline.palette.bloom,
     grain: grain && !timeline.transparent,
-    vignette: !glyph && !timeline.transparent,
+    vignette: !flat && !timeline.transparent,
     transparent: timeline.transparent
   }
 }

@@ -175,13 +175,15 @@ function meanRadius(pts: Vec2[]): number {
   return pts.reduce((s, p) => s + Math.hypot(p.x - c.x, p.y - c.y), 0) / pts.length
 }
 
-/** seven or more pins on one circle of at least 3 mm radius: a tube socket */
+/** seven or more pins ringing one circle of at least 3 mm radius: a tube socket */
 function onCircle(pts: Vec2[]): boolean {
   if (pts.length < 7) return false
   const c = circleOf(pts)
   const r = pts.map((p) => Math.hypot(p.x - c.x, p.y - c.y))
   const mean = r.reduce((s, x) => s + x, 0) / r.length
-  return mean > 3 && Math.max(...r.map((x) => Math.abs(x - mean))) < 0.08 * mean
+  const angles = pts.map((p) => Math.atan2(p.y - c.y, p.x - c.x)).sort((a, b) => a - b)
+  const gap = Math.max(2 * Math.PI + (angles[0] as number) - (angles[angles.length - 1] as number), ...angles.slice(1).map((a, i) => a - (angles[i] as number)))
+  return mean > 3 && gap < Math.PI / 2 && Math.max(...r.map((x) => Math.abs(x - mean))) < 0.08 * mean
 }
 
 function pitchOf(pts: Vec2[]): number {

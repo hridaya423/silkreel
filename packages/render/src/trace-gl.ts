@@ -1,5 +1,5 @@
 import { makeCam, norm, sampleShot } from '@silk-reel/choreo'
-import type { Cam, CameraShot, TraceTimeline } from '@silk-reel/choreo'
+import type { Cam, CameraShot, TracePart, TraceTimeline } from '@silk-reel/choreo'
 import { createMaps, drawMaps } from './trace-maps'
 import type { MapSet, Region } from './trace-maps'
 import { compileShader } from './post'
@@ -249,6 +249,36 @@ void main(){
   o = vec4(col, 1.0);
 }`
 
+const LANDING = `
+// mirrors partDrop in trace-maps: fast in, set down gently
+float drop(float t, float p, float hero){
+  float dur = (hero > 0.5 ? 0.75 : 0.5) / 24.0;
+  float u = (p - (t - dur)) / dur;
+  if (u <= 0.0) return 1.0;
+  if (u >= 1.0) return 0.0;
+  return (1.0 - u) * (1.0 - u) * (1.0 - u);
+}
+// the solder melts: surface tension pulls the part square with a small overshoot
+float snapBack(float s){ return s <= 0.0 ? 1.0 : exp(-s / 0.05) * cos(6.2832 * s / 0.2); }
+`
+
+const MARKING = `
+// the laser-etched marking on an IC's top face (q: 0..1 across the body)
+float marking(vec2 q){
+  if (vLabel.z < 0.5) return 0.0;
+  // the marking runs along the long side, at the atlas cell's 4:1 aspect
+  bool wide = vSize.x >= vSize.y;
+  vec2 t = wide ? q : vec2(q.y, 1.0 - q.x);
+  float longS = max(vSize.x, vSize.y), shortS = min(vSize.x, vSize.y);
+  float hFrac = min(0.5, 0.78 * longS / 4.0 / shortS);
+  float wFrac = hFrac * shortS * 4.0 / longS;
+  vec2 tc = vec2((t.x - 0.5) / wFrac + 0.5, (t.y - 0.5) / hFrac + 0.5);
+  if (vLabel.z > 1.5) tc = 1.0 - tc;
+  vec2 gx = dFdx(tc) * uCell, gy = dFdy(tc) * uCell;
+  if (tc.x <= 0.0 || tc.x >= 1.0 || tc.y <= 0.0 || tc.y >= 1.0) return 0.0;
+  return textureGrad(tAtlas, (vLabel.xy + tc) * uCell, gx, gy).r;
+}`
+
 const VS_PART = `#version 300 es
 in vec4 aBox;   // plane x, y, w, h
 in vec4 aMeta;  // rot, height px, kind, landing time
@@ -261,16 +291,7 @@ const vec3 C[8] = vec3[8](vec3(-.5,-.5,0), vec3(.5,-.5,0), vec3(.5,.5,0), vec3(-
                           vec3(-.5,-.5,1), vec3(.5,-.5,1), vec3(.5,.5,1), vec3(-.5,.5,1));
 const int I[36] = int[36](4,5,6, 4,6,7, 0,2,1, 0,3,2, 0,1,5, 0,5,4, 1,2,6, 1,6,5, 2,3,7, 2,7,6, 3,0,4, 3,4,7);
 const vec3 FN[6] = vec3[6](vec3(0,0,1), vec3(0,0,-1), vec3(0,-1,0), vec3(1,0,0), vec3(0,1,0), vec3(-1,0,0));
-// mirrors partDrop in trace-maps: fast in, set down gently
-float drop(float t, float p, float hero){
-  float dur = (hero > 0.5 ? 0.75 : 0.5) / 24.0;
-  float u = (p - (t - dur)) / dur;
-  if (u <= 0.0) return 1.0;
-  if (u >= 1.0) return 0.0;
-  return (1.0 - u) * (1.0 - u) * (1.0 - u);
-}
-// the solder melts: surface tension pulls the part square with a small overshoot
-float snapBack(float s){ return s <= 0.0 ? 1.0 : exp(-s / 0.05) * cos(6.2832 * s / 0.2); }
+${LANDING}
 // a 24-sided cylinder in the unit box: sides, then the top cap
 const int SEG = 24;
 void cylinder(int id, out vec3 c, out vec3 n){
@@ -320,6 +341,7 @@ precision highp float;
 in vec3 vW; in vec3 vN; in vec3 vL; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in float vRot; flat in vec4 vLed; out vec4 o;
 uniform sampler2D tAtlas; uniform vec2 uCell; uniform vec3 uFinish; uniform float uLedOn; uniform float uHeat;
 ${LIGHTING}
+${MARKING}
 void main(){
   vec3 V = normalize(uCam - vW);
   int kind = int(vMeta.z + 0.5);
@@ -344,20 +366,8 @@ void main(){
       vec2 q = vL.xy + 0.5;
       float dimple = 1.0 - smoothstep(0.035, 0.05, length((q - vec2(0.13, 0.13)) * vSize / max(vSize.x, vSize.y)));
       alb = mix(alb, vec3(0.012), dimple); rough = mix(rough, 0.2, dimple);
-      if (vLabel.z > 0.5) {
-        // the marking runs along the long side, at the atlas cell's 4:1 aspect
-        bool wide = vSize.x >= vSize.y;
-        vec2 t = wide ? q : vec2(q.y, 1.0 - q.x);
-        float longS = max(vSize.x, vSize.y), shortS = min(vSize.x, vSize.y);
-        float hFrac = min(0.5, 0.78 * longS / 4.0 / shortS);
-        float wFrac = hFrac * shortS * 4.0 / longS;
-        vec2 tc = vec2((t.x - 0.5) / wFrac + 0.5, (t.y - 0.5) / hFrac + 0.5);
-        if (vLabel.z > 1.5) tc = 1.0 - tc;
-        if (tc.x > 0.0 && tc.x < 1.0 && tc.y > 0.0 && tc.y < 1.0) {
-          float m = texture(tAtlas, (vLabel.xy + tc) * uCell).r;
-          alb = mix(alb, vec3(0.16, 0.16, 0.165), m); rough = mix(rough, 0.75, m);
-        }
-      }
+      float m = marking(q);
+      alb = mix(alb, vec3(0.16, 0.16, 0.165), m); rough = mix(rough, 0.75, m);
     }
   } else if (kind == 1) {     // resistor: black top, white ceramic sides, tin ends
     alb = top > 0.5 ? vec3(0.02) : vec3(0.55, 0.53, 0.5); rough = 0.55;
@@ -411,6 +421,71 @@ void main(){
   }
   vec3 col = shade(N, V, alb, metal, rough, 0.045);
   // the underside hugs the board: ambient occlusion at the foot of every wall
+  col *= mix(0.45, 1.0, smoothstep(0.0, 0.35, vL.z));
+  o = vec4(col + emit, 1.0);
+}`
+
+const VS_MESH = `#version 300 es
+in vec3 aPos; in vec3 aNor; in vec3 aCol;  // footprint-local mm (y down, z up), unit normal, sRGB
+in vec4 aAff;   // local mm to plane px, the linear part
+in vec4 aBox; in vec4 aMeta; in vec4 aLabel; in vec4 aSkew; in vec4 aLed;  // as for the boxes
+uniform mat4 uVP; uniform float uP; uniform float uDur; uniform float uFall; uniform vec3 uMin; uniform vec3 uMax;
+out vec3 vW; out vec3 vN; out vec3 vL; out vec2 vQ; out vec3 vCol; flat out vec4 vMeta; flat out vec4 vLabel; flat out vec2 vSize; flat out vec4 vLed;
+${LANDING}
+void main(){
+  float dr = drop(aMeta.w, uP, aLabel.w);
+  float k = snapBack((uP - aSkew.w) * uDur);
+  vec3 c = 0.5 * (uMin + uMax);
+  vec2 d = aPos.xy - c.xy;
+  vec2 lp = vec2(aAff.x * d.x + aAff.z * d.y, aAff.y * d.x + aAff.w * d.y);
+  float a = aSkew.z * k, cr = cos(a), sr = sin(a);
+  vec2 pp = aBox.xy + aSkew.xy * k + vec2(lp.x * cr - lp.y * sr, lp.x * sr + lp.y * cr);
+  float scale = length(aAff.xy);
+  float paste = max(0.0, k) * min(1.5, 0.08 * aMeta.y);
+  float fall = dr * max(aMeta.y * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall);
+  vW = vec3(pp.x, -pp.y, fall + paste + aPos.z * scale);
+  vec2 n = vec2(aAff.x * aNor.x + aAff.z * aNor.y, aAff.y * aNor.x + aAff.w * aNor.y) / scale;
+  n = vec2(n.x * cr - n.y * sr, n.x * sr + n.y * cr);
+  vN = vec3(n.x, -n.y, aNor.z);
+  vL = vec3((aPos.xy - c.xy) / max(uMax.xy - uMin.xy, vec2(1e-3)), aPos.z / max(uMax.z, 1e-3));
+  // the marking reads in the boxes' frame, so it keeps their left-to-right flip
+  float br = cos(aMeta.x), bs = sin(aMeta.x);
+  vQ = vec2(lp.x * br + lp.y * bs, -lp.x * bs + lp.y * br) / aBox.zw + 0.5;
+  vCol = aCol;
+  vMeta = aMeta;
+  vLabel = aLabel;
+  vSize = aBox.zw;
+  vLed = aLed;
+  gl_Position = dr > 0.999 ? vec4(2.0, 2.0, 2.0, 1.0) : uVP * vec4(vW, 1.0);
+}`
+
+const FS_MESH = `#version 300 es
+precision highp float;
+in vec3 vW; in vec3 vN; in vec3 vL; in vec2 vQ; in vec3 vCol; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in vec4 vLed; out vec4 o;
+uniform sampler2D tAtlas; uniform vec2 uCell; uniform float uLedOn;
+${LIGHTING}
+${MARKING}
+void main(){
+  vec3 V = normalize(uCam - vW);
+  vec3 N = length(vN) > 0.1 ? normalize(vN) : normalize(cross(dFdx(vW), dFdy(vW)));
+  if (dot(N, V) < 0.0) N = -N;
+  int kind = int(vMeta.z + 0.5);
+  // the model's own paint: light neutral greys and golds are plated leads, the rest is moulded plastic
+  float lum = dot(vCol, vec3(0.299, 0.587, 0.114));
+  float chroma = max(vCol.r, max(vCol.g, vCol.b)) - min(vCol.r, min(vCol.g, vCol.b));
+  float gold = step(0.4, lum) * step(0.15, chroma) * step(vCol.g, vCol.r) * step(vCol.b + 0.2, vCol.r);
+  float metal = max(step(0.55, lum) * step(chroma, 0.1), gold);
+  vec3 alb = max(pow(vCol, vec3(2.2)), vec3(0.02));
+  float rough = mix(0.48, 0.28, metal);
+  vec3 emit = vec3(0.0);
+  float top = step(0.9, N.z) * step(0.98, vL.z);
+  if (kind == 0) {
+    float m = marking(vQ) * top;
+    alb = mix(alb, vec3(0.16, 0.16, 0.165), m); rough = mix(rough, 0.75, m);
+  } else if (kind == 5) {
+    emit = vLed.rgb * uLedOn * 3.2 * vLed.a * smoothstep(0.4, 1.0, vL.z) * (1.0 - metal);
+  }
+  vec3 col = shade(N, V, alb, metal, rough, 0.045);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.35, vL.z));
   o = vec4(col + emit, 1.0);
 }`
@@ -600,6 +675,8 @@ const KIND_ID: Record<string, number> = { ic: 0, res: 1, cap: 2, ind: 3, diode: 
 const ROUND = new Set(['can', 'valve'])
 const rank = (kind: string): number => (kind === 'valve' ? 2 : ROUND.has(kind) ? 1 : 0)
 
+const bytes = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))
+
 const ease = (x: number): number => {
   const t = Math.min(1, Math.max(0, x))
   return t * t * (3 - 2 * t)
@@ -640,6 +717,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
     floor: link(g, VS_PLANE, FS_FLOOR),
     wall: link(g, VS_WALL, FS_WALL),
     part: link(g, VS_PART, FS_PART),
+    mesh: link(g, VS_MESH, FS_MESH),
     copy: link(g, VS_QUAD, FS_COPY),
     dof: link(g, VS_QUAD, FS_DOF),
     bright: link(g, VS_QUAD, FS_BRIGHT),
@@ -723,6 +801,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
   let boxCount = 0
   let roundCount = 0
   let valveCount = 0
+  let meshDraws: Array<{ pos: WebGLBuffer; nor: WebGLBuffer; col: WebGLBuffer; idx: WebGLBuffer; inst: WebGLBuffer; count: number; parts: number; min: number[]; max: number[] }> = []
   let extent: Region = { x: 0, y: 0, w: width, h: height }
   let boardX: [number, number] = [0, width]
   const CELL_W = 256
@@ -771,10 +850,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
     actx.textAlign = 'center'
     actx.textBaseline = 'middle'
     let cell = 0
-    const inst: number[] = []
-    // boxes first, round bodies after: each set draws with its own mesh
-    const ordered = [...s.parts].sort((x, y) => rank(x.kind) - rank(y.kind))
-    for (const part of ordered) {
+    const instanceOf = (part: TracePart): number[] => {
       let col = 0
       let row = 0
       let has = 0
@@ -790,23 +866,48 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         cell++
       }
       // connectors carry their pin pitch and pins their housing height where ICs carry their marking flag
-      const third = part.kind === 'conn' ? (part.pitch ?? 0) : part.kind === 'pin' ? (part.seat ?? 0) : has
-      inst.push(
+      const third = part.kind === 'conn' && part.mesh === undefined ? (part.pitch ?? 0) : part.kind === 'pin' ? (part.seat ?? 0) : has
+      return [
         part.x, part.y, part.w, part.h,
         part.rot, part.z, KIND_ID[part.kind] ?? 10, part.t,
         col, row, third, part.hero === true ? 1 : 0,
         part.skew[0], part.skew[1], part.skew[2], part.settle,
         ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color), part.led.gain])
-      )
+      ]
     }
+    // boxes first, round bodies after: each set draws with its own mesh
+    const ordered = s.parts.filter((pt) => pt.mesh === undefined).sort((x, y) => rank(x.kind) - rank(y.kind))
+    const inst = ordered.flatMap(instanceOf)
+    for (const d of meshDraws) for (const b of [d.pos, d.nor, d.col, d.idx, d.inst]) g.deleteBuffer(b)
+    meshDraws = s.meshes.map((mesh, id) => {
+      const wearing = s.parts.filter((pt) => pt.mesh?.id === id)
+      const upload = (target: number, data: ArrayBufferView): WebGLBuffer => {
+        const b = g.createBuffer()
+        g.bindBuffer(target, b)
+        g.bufferData(target, data, g.STATIC_DRAW)
+        return b
+      }
+      const idx = new Uint32Array(bytes(mesh.idx).buffer)
+      return {
+        pos: upload(g.ARRAY_BUFFER, new Float32Array(bytes(mesh.pos).buffer)),
+        nor: upload(g.ARRAY_BUFFER, bytes(mesh.nor)),
+        col: upload(g.ARRAY_BUFFER, bytes(mesh.col)),
+        idx: upload(g.ELEMENT_ARRAY_BUFFER, idx),
+        inst: upload(g.ARRAY_BUFFER, new Float32Array(wearing.flatMap((pt) => [...(pt.mesh?.m.slice(0, 4) ?? []), ...instanceOf(pt)]))),
+        count: idx.length,
+        parts: wearing.length,
+        min: mesh.min,
+        max: mesh.max
+      }
+    })
     g.bindTexture(g.TEXTURE_2D, atlasTex)
     g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, g.RGBA, g.UNSIGNED_BYTE, atlas)
     g.generateMipmap(g.TEXTURE_2D)
     g.bindBuffer(g.ARRAY_BUFFER, partBuf)
     g.bufferData(g.ARRAY_BUFFER, new Float32Array(inst), g.STATIC_DRAW)
-    valveCount = s.parts.filter((pt) => rank(pt.kind) === 2).length
-    roundCount = s.parts.filter((pt) => rank(pt.kind) === 1).length
-    boxCount = s.parts.length - roundCount - valveCount
+    valveCount = ordered.filter((pt) => rank(pt.kind) === 2).length
+    roundCount = ordered.filter((pt) => rank(pt.kind) === 1).length
+    boxCount = ordered.length - roundCount - valveCount
   }
 
   /**
@@ -960,7 +1061,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .f('uHeat', heat).f('uHeatX', boardX[0] + heatU * (boardX[1] - boardX[0])).f('uHeatW', 0.12 * extent.w)
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
-        if (boxCount + roundCount + valveCount > 0) {
+        if (boxCount + roundCount + valveCount + meshDraws.length > 0) {
           // bodies: opaque, depth-tested, sampled at the subframe's own time so falls blur
           g.disable(g.BLEND)
           g.bindBuffer(g.ARRAY_BUFFER, partBuf)
@@ -988,20 +1089,60 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
             P.part.i('uRound', 1)
             g.drawArraysInstanced(g.TRIANGLES, 0, 24 * 9, roundCount)
           }
+          for (const loc of locs) {
+            g.vertexAttribDivisor(loc, 0)
+            g.disableVertexAttribArray(loc)
+          }
+          if (meshDraws.length > 0) {
+            P.mesh.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
+              .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS)
+              .f('uLedOn', span([acts.power[0], acts.power[0] + 0.01]))
+            lighting(P.mesh, c, p, room)
+            const vertex = ([['aPos', 3, g.FLOAT, false], ['aNor', 3, g.BYTE, true], ['aCol', 3, g.UNSIGNED_BYTE, true]] as const).map(([n, size, type, normalized]) => ({ loc: g.getAttribLocation(P.mesh.p, n), size, type, normalized }))
+            const perPart = ['aAff', 'aBox', 'aMeta', 'aLabel', 'aSkew', 'aLed'].map((n) => g.getAttribLocation(P.mesh.p, n))
+            for (const d of meshDraws) {
+              if (d.parts === 0) continue
+              for (const [i, a] of vertex.entries()) {
+                g.bindBuffer(g.ARRAY_BUFFER, [d.pos, d.nor, d.col][i] as WebGLBuffer)
+                g.enableVertexAttribArray(a.loc)
+                g.vertexAttribPointer(a.loc, a.size, a.type, a.normalized, 0, 0)
+              }
+              g.bindBuffer(g.ARRAY_BUFFER, d.inst)
+              for (const [i, loc] of perPart.entries()) {
+                g.enableVertexAttribArray(loc)
+                g.vertexAttribPointer(loc, 4, g.FLOAT, false, 24 * 4, i * 16)
+                g.vertexAttribDivisor(loc, 1)
+              }
+              g.bindBuffer(g.ELEMENT_ARRAY_BUFFER, d.idx)
+              P.mesh.f('uMin', ...d.min).f('uMax', ...d.max)
+              g.drawElementsInstanced(g.TRIANGLES, d.count, g.UNSIGNED_INT, 0, d.parts)
+            }
+            for (const loc of perPart) {
+              g.vertexAttribDivisor(loc, 0)
+              g.disableVertexAttribArray(loc)
+            }
+            for (const a of vertex) g.disableVertexAttribArray(a.loc)
+          }
           if (valveCount > 0) {
+            g.bindBuffer(g.ARRAY_BUFFER, partBuf)
+            P.part.use()
+            for (const [i, loc] of locs.entries()) {
+              g.enableVertexAttribArray(loc)
+              g.vertexAttribDivisor(loc, 1)
+              g.vertexAttribPointer(loc, 4, g.FLOAT, false, stride, (boxCount + roundCount) * stride + i * 16)
+            }
             // glass: blended over everything drawn so far, without hiding what is behind it
             g.enable(g.BLEND)
             g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA)
             g.depthMask(false)
-            point(boxCount + roundCount)
             P.part.i('uRound', 1)
             g.drawArraysInstanced(g.TRIANGLES, 0, 24 * 9, valveCount)
             g.depthMask(true)
             g.disable(g.BLEND)
-          }
-          for (const loc of locs) {
-            g.vertexAttribDivisor(loc, 0)
-            g.disableVertexAttribArray(loc)
+            for (const loc of locs) {
+              g.vertexAttribDivisor(loc, 0)
+              g.disableVertexAttribArray(loc)
+            }
           }
           g.enable(g.BLEND)
         }

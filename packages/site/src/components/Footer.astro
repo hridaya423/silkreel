@@ -1,18 +1,27 @@
 ---
 import FooterFigure from './FooterFigure.astro'
+import { site } from '../data/site'
 ---
 <footer class="ft">
   <FooterFigure />
+  <nav class="ft__row" aria-label="Footer">
+    <a class="ft__name" href="/">silk reel</a>
+    <a class="prose-link" href={site.repo}>GitHub</a>
+    <a class="prose-link" href="/docs/">Docs</a>
+  </nav>
 </footer>
 <script>
   import { setupFigure } from '../motion/figure'
-  // the bench is a large drawing: it is wired up only as the footer comes near, so it never costs the page's first seconds
-  const fig = document.querySelector('.ft__fig')
+  // the bench is a large drawing: it is fetched and wired up only as the footer comes near, so it never costs the page's first seconds
+  const fig = document.querySelector<HTMLElement>('.ft__fig')
   if (fig) {
     const near = new IntersectionObserver((entries) => {
       if (!entries.some((e) => e.isIntersecting)) return
       near.disconnect()
-      setupFigure()
+      void fetch('/figure/bench.svg').then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))).then((svg) => {
+        fig.innerHTML = svg
+        setupFigure()
+      }, () => { /* the bench is decoration; the footer links stay */ })
     }, { rootMargin: '150% 0px' })
     near.observe(fig)
   }
@@ -20,4 +29,10 @@ import FooterFigure from './FooterFigure.astro'
 <style>
   .ft { position: relative; z-index: 3; padding: clamp(40px, 5vh, 56px) var(--gutter) var(--gutter); background: var(--c-bg); overflow-x: clip; }
   :global(html:not(.motion) .ft__fig) { cursor: auto; }
+  /* the bench as a pen drawing: paper faces, one ink line; the film, the screen and the board on it stay black */
+  .ft :global(.ft__fig) { --anatomy-face: var(--opal); --anatomy-top: var(--opal); --anatomy-lit-top: var(--opal); --anatomy-lit-shade: var(--opal);
+    --anatomy-shade-0: var(--opal); --anatomy-shade-1: var(--opal); --anatomy-shade-2: var(--opal); --anatomy-shade-3: var(--opal);
+    --anatomy-hi: #151515; --anatomy-mid: #151515; --anatomy-lo: #151515; --anatomy-faint: #8c8c86; --anatomy-halo-opacity: 0; --anatomy-weight: 0.9px; margin-top: clamp(24px, 5vh, 56px); }
+  .ft__row { display: flex; gap: 24px; align-items: baseline; margin-top: clamp(28px, 5vh, 48px); padding-top: 16px; border-top: 1px solid var(--c-line-2); font-size: var(--t-xs); }
+  .ft__name { margin-right: auto; font-weight: 600; color: var(--c-ink); text-decoration: none; }
 </style>

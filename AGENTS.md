@@ -24,6 +24,7 @@ KiCad board in, release video out. TypeScript monorepo (npm workspaces):
 
 - `SILK_REEL_GL`: Chromium GL backend for renders (default `angle`, which uses the GPU; use `swangle` on GPU-less CI/servers)
 - `SILK_REEL_CONCURRENCY`: Remotion frame concurrency (default: half the cores)
+- `SILK_REEL_MODELS`: extra STEP folders for the render API and `trace-stills.mts`, separated by `:` (`;` on Windows); `none` makes `trace-stills.mts` skip models
 
 ## The review gate: tests prove structure, not beauty
 
@@ -52,6 +53,7 @@ Deterministic tests pass on videos that look like slop. A change to anything vis
 - `npx tsx scripts/flicker.mts video.mp4` measures frame-to-frame shimmer per second; compare it before and after any change to the trace look.
 - WebGL: `gl.clear` respects `depthMask`. Re-open it before clearing, or last frame's depth survives (single stills look fine, videos go black). Never `pow(x, 2.0)` in GLSL with x possibly negative (NaN on Metal/ANGLE); use `sq()`.
 - Trace review renders: `SILK_REEL_CONCURRENCY=4` avoids GPU-memory browser crashes on this machine.
+- Part models: `render-api/src/models.ts` tessellates STEP files (occt-import-js) into footprint-local meshes; `compileTimeline(board, config, bodies)` attaches them and `trace-gl.ts` draws them instanced (`VS_MESH`). KiCad negates model rotation angles, and a back footprint's local frame is stored mirrored in y. A model must cover 75% of its pads or the part keeps its estimated body. The studio preview compiles in the browser and shows estimated bodies only.
 - A hero footprint on the back copper flips the trace film to the back side (mirrored, sides swapped), e.g. StickHub.
 - Alpha formats need `transparent: true`; the queue and CLI set it automatically. GIFs render without grain and at ≤720px wide (`renderFilm` does both).
 - Never pixel-hash post-processed frames in tests. GPU output differs across machines, so test the 2D draw through `test-recorder.ts`.

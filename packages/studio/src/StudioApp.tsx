@@ -626,7 +626,7 @@ const LookPanel: React.FC<{ look: Look; onLook: (patch: Partial<Look>) => void; 
   const heroes = useMemo(() => heroChoices(board), [board])
   const autoHero = useMemo(() => heroPart(board, undefined, castHints(board)), [board])
   const boardMask = board.stackup.maskColor?.toLowerCase()
-  const defaultPalette = look.style === 'glyph' ? 'mono' : 'copper'
+  const defaultPalette = look.style === 'glyph' ? 'mono' : look.style === 'plot' ? 'paper' : 'copper'
   const activePalette = look.palette ?? defaultPalette
   const activeHead = PALETTE_LIST.find((p) => p.id === activePalette)?.head ?? '#ffffff'
   return (

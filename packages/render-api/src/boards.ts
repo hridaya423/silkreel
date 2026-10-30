@@ -3,7 +3,7 @@ import path from 'node:path'
 import { parseKicadPcb } from '@silk-reel/ingest'
 import type { BoardModel } from '@silk-reel/ingest'
 import { compileTimeline, DEMO_CAST_HINTS } from '@silk-reel/choreo'
-import type { FilmConfig, Timeline } from '@silk-reel/choreo'
+import type { FilmConfig, PartBodies, Timeline } from '@silk-reel/choreo'
 import type { FilmInputProps } from '@silk-reel/render'
 
 export const DEMO_BOARDS = [
@@ -20,7 +20,7 @@ export function isDemoBoardId(value: string): value is DemoBoardId {
   return (DEMO_BOARDS as readonly string[]).includes(value)
 }
 
-const boardsRoot = path.resolve(import.meta.dirname, '../../../fixtures/boards')
+export const boardsRoot = path.resolve(import.meta.dirname, '../../../fixtures/boards')
 
 const cache = new Map<string, BoardModel>()
 
@@ -52,8 +52,8 @@ export function boardFromJson(boardJson: unknown): BoardModel {
   return boardJson as unknown as BoardModel
 }
 
-export function compileFilm(board: BoardModel, config: FilmConfig): { timeline: Timeline; inputProps: FilmInputProps } {
-  const timeline = compileTimeline(board, config)
+export function compileFilm(board: BoardModel, config: FilmConfig, bodies?: PartBodies): { timeline: Timeline; inputProps: FilmInputProps } {
+  const timeline = compileTimeline(board, config, bodies)
   return { timeline, inputProps: { timeline } }
 }
 

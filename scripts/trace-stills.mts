@@ -1,5 +1,6 @@
 // trace look-loop: stills of the lit trace renderer at chosen phases, one sheet per board
 // usage: npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
+// part models: SILK_REEL_MODELS=dir1:dir2 adds STEP folders (; on Windows); SILK_REEL_MODELS=none keeps estimated bodies
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
@@ -10,6 +11,7 @@ import { ASPECT_SIZE, compileTimeline } from '../packages/choreo/src/index.ts'
 import type { Aspect, FilmConfig } from '../packages/choreo/src/index.ts'
 import { parseKicadPcb } from '../packages/ingest/src/index.ts'
 import { loadDemoBoard, defaultFilmConfig } from '../packages/render-api/src/boards.ts'
+import { loadPartBodies } from '../packages/render-api/src/models.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const [boardsArg = 'glasgow', aspect = '4:5', atArg = '0.05,0.3,0.62,0.9', outArg = 'review/trace-stills'] = process.argv.slice(2)
@@ -23,7 +25,10 @@ try {
     const board = own ? path.basename(arg, '.kicad_pcb') : arg
     const size = ASPECT_SIZE[aspect as Aspect]
     const config = { ...defaultFilmConfig(board), style: 'trace', aspect, output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
-    const timeline = compileTimeline(own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board), config)
+    const model = own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board)
+    const dirs = process.env.SILK_REEL_MODELS?.split(path.delimiter) ?? []
+    const bodies = dirs[0] === 'none' ? undefined : (await loadPartBodies(model, { boardDir: own ? path.dirname(path.resolve(arg)) : path.join(root, 'fixtures/boards'), dirs })).bodies
+    const timeline = compileTimeline(model, config, bodies)
     const inputProps = { timeline }
     const composition = await selectComposition({ serveUrl, id: 'film', inputProps })
     const files: string[] = []
@@ -35,7 +40,7 @@ try {
       files.push(file)
     }
     const sheet = path.join(out, `${board}-${aspect.replace(':', 'x')}-sheet.png`)
-    execFileSync('ffmpeg', ['-v', 'error', '-y', ...files.flatMap((f) => ['-i', f]), '-filter_complex', `${files.map((_, i) => `[${i}]scale=-1:900[s${i}]`).join(';')};${files.map((_, i) => `[s${i}]`).join('')}hstack=${files.length}`, sheet])
+    if (files.length > 1) execFileSync('ffmpeg', ['-v', 'error', '-y', ...files.flatMap((f) => ['-i', f]), '-filter_complex', `${files.map((_, i) => `[${i}]scale=-1:900[s${i}]`).join(';')};${files.map((_, i) => `[s${i}]`).join('')}hstack=${files.length}`, sheet])
     console.log(path.relative(root, sheet))
   }
 } finally {

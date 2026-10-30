@@ -51,6 +51,10 @@ A trace film takes about 30 seconds to render on an Apple M4 Pro, and the file i
 
 If your machine has no GPU, put `SILK_REEL_GL=swangle` in front of the command. To list every flag, run `npm run reel -- --help`.
 
+### Part models
+
+A trace film shows each part's own 3D model when it can find the STEP file. It reads the model paths in your board, as KiCad does: `${KIPRJMOD}` and relative paths start at the board's folder, and `${KICADn_3DMODEL_DIR}` uses that variable or the KiCad library install. Where a footprint names a `.wrl`, silk reel looks for the `.step` beside it. Add folders with `--models DIR`; silk reel searches them by the model's library path, then by file name. This suits models exported from Fusion 360 into one folder. A part without a model, or with a model that does not sit on its pads, keeps an estimated body, and the CLI lists both cases.
+
 The film is about one part, the hero. silk reel picks the IC with the most pads, then any other part with eight or more pads, then the connector with the most pads. Name a different part with `--hero U3`.
 
 ## Options
@@ -70,6 +74,8 @@ The film is about one part, the hero. silk reel picks the IC with the most pads,
 | `--tempo` | the speed of the film, from `0.75` to `1.5` | `1` |
 | `--draft` | fast preview quality | off |
 | `--no-audio` | leave the score out of a trace film | off |
+| `--models` | another folder of STEP models; repeat it for more | the board's paths and the KiCad library |
+| `--no-models` | estimated part bodies only | off |
 | `-o` | output path | `<board>-<style>-<aspect>.<ext>` beside the input |
 | `-h`, `--help` | list every flag | |
 
@@ -119,6 +125,7 @@ Every change to how a film looks goes through a full-video review. [AGENTS.md](A
 
 - **Sample boards:** [iCEBreaker](https://github.com/icebreaker-fpga/icebreaker) © 2019 1BitSquared, CC BY-SA 4.0. [Glasgow](https://github.com/GlasgowEmbedded/glasgow) rev C3, Glasgow Embedded, 0BSD. StickHub, the ECC83 preamp, the ColdFire dev kit and the video board are KiCad demo projects.
 - **Sound:** CC0 recordings from Freesound, listed in [CREDITS.md](packages/render-api/assets/sound/CREDITS.md).
+- **STEP reading:** [occt-import-js](https://github.com/kovacsv/occt-import-js) and Open CASCADE Technology, both LGPL 2.1, used unmodified as an npm dependency.
 - **Type:** title cards use JetBrains Mono (SIL Open Font License 1.1, [`OFL.txt`](packages/render/src/assets/OFL.txt)), bundled so renders match on every machine.
 
 ## License

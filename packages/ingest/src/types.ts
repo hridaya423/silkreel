@@ -75,6 +75,21 @@ export interface Footprint {
   silkRefs: string[]
   /** file name of the first 3D model, without folder or extension, e.g. PinHeader_1x07_P2.54mm_Vertical */
   model?: string | undefined
+  /** the visible 3D models, as written in the file: path, then offset (mm), scale and rotation (degrees) */
+  models: ModelRef[]
+}
+
+export interface ModelRef {
+  path: string
+  offset: Vec3
+  scale: Vec3
+  rotate: Vec3
+}
+
+export interface Vec3 {
+  x: number
+  y: number
+  z: number
 }
 
 

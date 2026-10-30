@@ -101,10 +101,9 @@
 .st__look:has(input:checked), .st__aspect:has(input:checked), .st__chip:has(input:checked) { box-shadow: inset 0 0 0 2px var(--c-ink); background: rgb(var(--ink-rgb) / 0.05); }
 @media (hover: hover) { .st__look:not(:has(input:checked)):hover, .st__aspect:not(:has(input:checked)):hover, .st__chip:not(:has(input:checked)):hover { box-shadow: inset 0 0 0 1px var(--c-ink); } }
 
-.st__looks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.st__look { display: grid; align-content: center; gap: 2px; min-height: 64px; padding: 10px 14px; }
+.st__looks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.st__look { display: grid; align-content: center; min-height: 52px; padding: 10px 14px; }
 .st__look-n { font-weight: 600; letter-spacing: -0.01em; }
-.st__look-t { font-size: var(--t-xs); color: var(--c-muted); }
 .st__note { font-size: var(--t-s); line-height: 1.5; color: var(--c-muted); }
 
 .st__inks { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; margin-inline: -4px; }

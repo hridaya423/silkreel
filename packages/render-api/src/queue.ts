@@ -5,7 +5,8 @@ import { ASPECT_SIZE } from '@silk-reel/choreo'
 import type { FilmConfig } from '@silk-reel/choreo'
 import { FORMAT_EXT, RENDER_ENTRY, isAlphaFormat, renderFilm } from './render-film.js'
 import type { OutputFormat } from './render-film.js'
-import { compileFilm, loadDemoBoard, boardFromJson, defaultFilmConfig } from './boards.js'
+import { boardsRoot, compileFilm, loadDemoBoard, boardFromJson, defaultFilmConfig } from './boards.js'
+import { loadPartBodies } from './models.js'
 import type { DemoBoardId } from './boards.js'
 const exportsRoot = path.resolve(import.meta.dirname, '../../../exports')
 
@@ -199,7 +200,11 @@ export class RenderQueue implements RenderQueuePort {
       if (this.isCancelled(rendering.id)) return
       const board = entry.source.kind === 'demo' ? await loadDemoBoard(entry.source.demoId) : boardFromJson(entry.source.boardJson)
       if (this.isCancelled(rendering.id)) return
-      const { inputProps } = compileFilm(board, entry.config)
+      const bodies = entry.config.style === 'trace'
+        ? (await loadPartBodies(board, { boardDir: entry.source.kind === 'demo' ? boardsRoot : undefined, dirs: process.env.SILK_REEL_MODELS?.split(path.delimiter) })).bodies
+        : undefined
+      if (this.isCancelled(rendering.id)) return
+      const { inputProps } = compileFilm(board, entry.config, bodies)
       const { format } = rendering
       outputLocation = path.join(this.exportsRoot, `${rendering.id}.${FORMAT_EXT[format]}`)
       if (this.isCancelled(rendering.id)) return

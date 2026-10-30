@@ -331,3 +331,49 @@ describe('VAL-INGEST-017 pad fidelity', () => {
     expect(model.stats.pads).toBe(2)
   })
 })
+
+describe('Edge.Cuts beyond lines and arcs', () => {
+  const edge = '(stroke (width 0.1)) (layer "Edge.Cuts")'
+  const model = parseKicadPcb(`(kicad_pcb (version 20240108) (layers (0 "F.Cu" signal) (44 "Edge.Cuts" user))
+    (gr_line (start 0 0) (end 50 0) ${edge})
+    (gr_curve (pts (xy 50 0) (xy 68 4) (xy 68 36) (xy 50 40)) ${edge})
+    (gr_line (start 50 40) (end 0 40) ${edge})
+    (gr_circle (center 30 20) (end 31.6 20) ${edge})
+    (footprint "Hole" (layer "F.Cu") (at 5 8 90)
+      (fp_circle (center 0 0) (end 1.6 0) ${edge})
+      (fp_line (start -2 -3) (end 2 -3) ${edge})))`, 'edge.kicad_pcb')
+
+  it('samples a spline edge into a polyline that meets its neighbours', () => {
+    const curve = model.outline.find((o) => o.points.length > 3 && !o.closed)
+    expect(curve?.points[0]).toEqual({ x: 50, y: 0 })
+    expect(curve?.points.at(-1)).toEqual({ x: 50, y: 40 })
+    expect(Math.max(...(curve?.points ?? []).map((p) => p.x))).toBeCloseTo(63.5, 1)
+  })
+
+  it('keeps board circles and footprint edge shapes as outline', () => {
+    expect(model.outline.filter((o) => o.closed)).toHaveLength(2)
+    const hole = model.outline.find((o) => o.closed && Math.abs((o.points[0]?.x ?? 0) - 6.6) < 0.01)
+    expect(hole).toBeDefined()
+    expect(model.outline.filter((o) => !o.closed)).toHaveLength(4)
+  })
+})
+
+describe('footprint 3D models', () => {
+  const model = parseKicadPcb(`(kicad_pcb (version 20240108) (layers (0 "F.Cu" signal))
+    (footprint "A" (layer "F.Cu") (at 1 2) (property "Reference" "U1")
+      (model "\${KICAD8_3DMODEL_DIR}/Package_SO.3dshapes/SOIC-8.wrl" (offset (xyz 0.5 0 0)) (scale (xyz 1 1 1)) (rotate (xyz -90 0 90)))
+      (model "hidden.step" (hide yes)))
+    (module "B" (layer "F.Cu") (at 3 4) (fp_text reference "U2" (at 0 0) (layer "F.SilkS"))
+      (model legacy.wrl (at (xyz 0.1 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))))`, 'models.kicad_pcb')
+
+  it('keeps each visible model with its offset, scale and rotation', () => {
+    expect(model.footprints[0]?.models).toEqual([{
+      path: '${KICAD8_3DMODEL_DIR}/Package_SO.3dshapes/SOIC-8.wrl',
+      offset: { x: 0.5, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, rotate: { x: -90, y: 0, z: 90 }
+    }])
+  })
+
+  it('reads a KiCad 5 offset in inches', () => {
+    expect(model.footprints[1]?.models[0]?.offset.x).toBeCloseTo(2.54, 6)
+  })
+})

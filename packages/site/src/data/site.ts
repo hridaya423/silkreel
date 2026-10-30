@@ -1,10 +1,13 @@
+const repo = 'https://github.com/hridaya423/silkreel'
+
 export const site = {
   name: 'silk reel',
   url: 'https://silkreel.hridya.tech',
-  repo: 'https://github.com/hridaya423/silkreel',
+  repo,
   line: 'KiCad in. Film out.',
   description: 'Turn a KiCad board file into a release film: the lit board under a camera, or its parts set as a looping glyph film. Any aspect, any format.',
-  command: 'npm run reel -- board.kicad_pcb'
+  command: 'npm run reel -- board.kicad_pcb',
+  setup: `git clone ${repo} && cd silkreel && npm ci`
 }
 
 /** the boards whose 16:9 trace film the site ships in public/films/trace (scripts/trace-films.sh) */

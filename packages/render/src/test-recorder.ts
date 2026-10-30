@@ -65,7 +65,7 @@ export class RecordingCtx {
       'setTransform', 'fillRect', 'clearRect', 'save', 'restore',
       'translate', 'scale', 'rotate',
       'stroke', 'fill', 'fillText', 'strokeText',
-      'beginPath', 'closePath', 'moveTo', 'lineTo', 'quadraticCurveTo', 'arc', 'rect',
+      'beginPath', 'closePath', 'moveTo', 'lineTo', 'quadraticCurveTo', 'arc', 'rect', 'roundRect',
       'setLineDash', 'drawImage', 'clip'
     ]
     for (const m of methods) target[m] = this.forward(m)
@@ -95,6 +95,7 @@ export class RecordingCtx {
       height: this.canvas.height
     })
     target.putImageData = this.forward('putImageData')
+    target.getTransform = (): { a: number } => ({ a: 1 })
   }
 }
 

@@ -140,7 +140,8 @@ export function syntheticBoardWithFootprints(count: number): BoardModel {
       rot: 0,
       layer: 'F.Cu',
       padRefs: [],
-      silkRefs
+      silkRefs,
+      models: []
     })
   }
   const silk = board.silkscreen['F.SilkS']

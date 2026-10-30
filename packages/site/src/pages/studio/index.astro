@@ -10,8 +10,9 @@ const frameIcon = (id: string, size = 22) => {
   return `width:${(w * k).toFixed(1)}px;height:${(h * k).toFixed(1)}px`
 }
 const looks = [
+  { id: 'plot', name: 'Plot', text: 'Drawn in pen' },
   { id: 'trace', name: 'Trace', text: 'The lit board' },
-  { id: 'glyph', name: 'Glyph', text: 'Parts set as type' }
+  { id: 'glyph', name: 'Glyph', text: 'Parts as type' }
 ] as const
 ---
 <Base title="Studio" description="Drop a KiCad board and watch its release film play in your browser. Change the look, then record it or copy the command." image="/og.png">
@@ -66,9 +67,10 @@ const looks = [
         <legend>Look</legend>
         <div class="st__looks">
           {looks.map((l) => (
-            <label class="st__look"><input type="radio" name="style" value={l.id} checked={l.id === 'glyph'} /><span class="st__look-n">{l.name}</span><span class="st__look-t">{l.text}</span></label>
+            <label class="st__look"><input type="radio" name="style" value={l.id} checked={l.id === 'plot'} /><span class="st__look-n">{l.name}</span><span class="st__look-t sr-only">{l.text}</span></label>
           ))}
         </div>
+        <p class="st__use" data-look-use aria-hidden="true">Drawn in pen</p>
         <p class="st__note" data-live-note hidden></p>
         <div class="st__inks" role="radiogroup" aria-label="Palette" data-only="glyph">
           {inks.map((k, i) => (

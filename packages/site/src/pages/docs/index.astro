@@ -23,7 +23,7 @@ const frames = [
   { ar: '9:16', size: '1080 × 1920', r: 9 / 16 },
   { ar: '16:9', size: '1920 × 1080', r: 16 / 9 }
 ].map((f) => ({ ...f, r: f.r.toFixed(4) }))
-const palettes = (['copper', 'mono', 'blueprint', 'phosphor'] as const).map((id) => ({ id, ...PALETTES[id] }))
+const palettes = (['copper', 'mono', 'blueprint', 'phosphor', 'paper'] as const).map((id) => ({ id, ...PALETTES[id] }))
 
 type Value = string | { frame: (typeof frames)[number] } | { swatch: (typeof palettes)[number] }
 interface Flag { flag: string; text: string; values?: Value[]; def: string }
@@ -31,8 +31,8 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
   {
     name: 'Look',
     rows: [
-      { flag: '--style', text: '`trace` films the lit board. `glyph` sets its footprints as type in a loop.', values: ['`trace`', '`glyph`'], def: '`trace`' },
-      { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`copper` for trace, `mono` for glyph' },
+      { flag: '--style', text: '`trace` films the lit board. `plot` draws the same film in pen on paper. `glyph` sets its footprints as type in a loop.', values: ['`trace`', '`plot`', '`glyph`'], def: '`trace`' },
+      { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`copper` for trace, `paper` for plot, `mono` for glyph' },
       { flag: '--accent', text: 'One highlight colour: the growing copper tips on trace, the main chip on glyph.', values: ['`#rrggbb`'], def: 'The palette’s own' },
       { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The IC with the most pads' },
       { flag: '--mask', text: 'The solder mask colour on trace.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
@@ -56,7 +56,7 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     rows: [
       { flag: '-o', text: 'Where the film is saved.', values: ['A file path'], def: 'Next to the board, as `board-trace-4x5.mp4`' },
       { flag: '--format', text: 'The file type.', values: ['`mp4`', '`gif`', '`webm-alpha`', '`prores-alpha`'], def: '`mp4`' },
-      { flag: '--no-audio', text: 'Leaves out the score that trace films carry.', def: 'Off' },
+      { flag: '--no-audio', text: 'Leaves out the score that trace and plot films carry.', def: 'Off' },
       { flag: '--draft', text: 'Renders faster at lower quality, to check a look before the final render.', def: 'Off' },
       { flag: '--help', text: 'Lists every flag.', def: 'Off' }
     ]
@@ -94,7 +94,7 @@ const env = [
     <header class="docs__head">
       <h1 class="xl"><Lettering text={"Render a film\nfrom the command line."} /></h1>
       <p class="lede">Install it, point it at a .kicad_pcb, and choose the look with flags. The same board and flags always render the same film.</p>
-      <div class="docs__film"><canvas class="docs__frame" data-docs-film width="720" height="720" aria-hidden="true"></canvas></div>
+      <div class="docs__film"><canvas class="docs__frame" data-docs-film aria-hidden="true"></canvas></div>
     </header>
 
     <div class="docs__body">
@@ -107,11 +107,12 @@ const env = [
       <article class="docs__main">
         <section id="install" class="doc">
           <h2 class="l"><Lettering text="Install" weight={0.09} /></h2>
-          <p class="body">You need Node.js 22 or later, and <code class="mono">ffmpeg</code> and <code class="mono">ffprobe</code> on your PATH. The first render downloads a headless Chrome of about 90 MB, once. silk reel reads <code class="mono">.kicad_pcb</code> files from KiCad 4 or later; it does not read Gerber, Eagle or Altium files.</p>
+          <p class="body">silk reel runs from its repository. You need Node.js 22 or later, git, and <code class="mono">ffmpeg</code> and <code class="mono">ffprobe</code> on your PATH. The first render downloads a headless Chrome of about 90 MB, once. silk reel reads <code class="mono">.kicad_pcb</code> files from KiCad 4 or later; it does not read Gerber, Eagle or Altium files.</p>
           <div class="term">
-            <div class="term__bar"><p class="silk">~/silk-reel</p><button type="button" class="term__copy silk" data-copy="npm install">Copy</button></div>
-            <pre class="term__body"><code><span class="term__c"># in your silk reel checkout</span>
-<span class="term__p">$</span>npm install</code></pre>
+            <div class="term__bar"><p class="silk">Terminal</p><button type="button" class="term__copy silk" data-copy={site.setup}><span data-copy-label data-roll>Copy</span></button></div>
+            <pre class="term__body"><code><span class="term__p">$</span>git clone {site.repo}
+<span class="term__p">$</span>cd silkreel
+<span class="term__p">$</span>npm ci</code></pre>
           </div>
         </section>
 
@@ -119,10 +120,10 @@ const env = [
           <h2 class="l"><Lettering text="Render a film" weight={0.09} /></h2>
           <p class="body">Give it one board file. Every flag is optional.</p>
           <div class="term">
-            <div class="term__bar"><p class="silk">~/silk-reel</p><button type="button" class="term__copy silk" data-copy={site.command}>Copy</button></div>
+            <div class="term__bar"><p class="silk">~/silkreel</p><button type="button" class="term__copy silk" data-copy={site.command}>Copy</button></div>
             <pre class="term__body"><code><span class="term__p">$</span>{site.command}</code></pre>
           </div>
-          <p class="body">A glyph film is an 11.2-second loop and renders in about ten seconds. A trace film runs 12 seconds, takes about 30 seconds on an Apple M4 Pro, and comes out near 8 MB. A trace render also writes <code class="mono">board.poster.png</code>, its last frame, for a cover image. <code class="mono">--draft</code> takes a fraction of the time.</p>
+          <p class="body">A glyph film is an 11.2-second loop and renders in about ten seconds. A trace film runs 12 seconds, takes about 30 seconds on an Apple M4 Pro, and comes out near 8 MB. A plot film follows the same 12-second score and camera, drawn in pen. Trace and plot renders also write <code class="mono">board.poster.png</code>, its last frame, for a cover image. <code class="mono">--draft</code> takes a fraction of the time.</p>
         </section>
 
         <section id="flags" class="doc">
@@ -182,7 +183,7 @@ const env = [
           <h2 class="l"><Lettering text="Self-hosting" weight={0.09} /></h2>
           <p class="body">The render API queues renders over HTTP and runs one at a time. The <a class="prose-link" href="/studio/">studio</a> sends its full-quality renders here, and your own tools can too.</p>
           <div class="term">
-            <div class="term__bar"><p class="silk">~/silk-reel</p><button type="button" class="term__copy silk" data-copy="npm run start --workspace=@silk-reel/render-api">Copy</button></div>
+            <div class="term__bar"><p class="silk">~/silkreel</p><button type="button" class="term__copy silk" data-copy="npm run start --workspace=@silk-reel/render-api">Copy</button></div>
             <pre class="term__body"><code><span class="term__c"># serves on port 3102</span>
 <span class="term__p">$</span>npm run start --workspace=@silk-reel/render-api</code></pre>
           </div>
@@ -222,30 +223,11 @@ const env = [
 </Base>
 
 <script>
-  import { ROOM } from '../../world/room'
-  import { drawStill } from '../../world/world'
-  import { fixtureFilm } from '../../world/films'
+  import { playPlot } from '../../cut/plot-loop'
   import { prefersReducedMotion } from '../../engine/env'
 
-  // the head carries the same film the home page opens on, looping while it is on screen
   const film = document.querySelector<HTMLCanvasElement>('[data-docs-film]')
-  if (film) {
-    void fixtureFilm('icebreaker', '1:1').then((f) => {
-      const total = f.tl.totalFrames
-      film.parentElement?.setAttribute('data-on', '')
-      if (prefersReducedMotion()) { drawStill(film, f, Math.round(total * 0.66), ROOM, 1.5); return }
-      let raf = 0, t0 = performance.now(), last = -1
-      const step = (now: number) => {
-        const frame = Math.floor(((now - t0) / 1000) * 30) % total
-        if (frame !== last) { last = frame; drawStill(film, f, frame, ROOM, 1.5) }
-        raf = requestAnimationFrame(step)
-      }
-      new IntersectionObserver(([e]) => {
-        cancelAnimationFrame(raf)
-        if (e?.isIntersecting) { t0 = performance.now() - (last < 0 ? 0 : last / 30) * 1000; raf = requestAnimationFrame(step) }
-      }).observe(film)
-    })
-  }
+  if (film) playPlot(film, '/films/plot/glasgow-16x9.json', prefersReducedMotion())
 
   const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc]')]
   const io = new IntersectionObserver((entries) => {

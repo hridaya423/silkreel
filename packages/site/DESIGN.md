@@ -4,7 +4,7 @@ silk reel turns a KiCad board file into a release film of that board. The site i
 
 ## Principles
 
-1. **Show the film, not the metaphor.** Sprocket holes, gates, strips and frames appear only on things that are film: the hero reel, the gate, the studio monitor and the footer bench. They never decorate a section edge, a label, an eyebrow or a table.
+1. **Show the film, not the metaphor.** Sprocket holes, strips and frames appear only on things that are film: the filmstrip under the cut, the studio monitor and the footer bench. They never decorate a section edge, a label, an eyebrow or a table.
 2. **Say it once.** No caption that restates the thing beside it, no label on an obvious control, no hint for something that just works, no copy defending a decision. A string stays only if the visitor cannot act without it (clean-copy ladder).
 3. **Plain words.** Public copy never uses the engine's vocabulary: drawings, beats, acts, spine, pillars, hero chip, designators, render API (outside the self-hosting docs), zones, sheets. The film's steps are named by what happens: draw, pour, mask, silk, place, reflow, wait, power, hold; grow, rise, frame, loop.
 4. **One focal point per screen, one primary action per screen.** One filled button a screen; everything else is outlined or a text link.
@@ -25,26 +25,27 @@ Short declarative sentences. Concrete nouns: board, film, frame, command. Second
 
 ## Colour
 
-- Opal `#ecede9` ground, stock `#0b0b0b` ink and dark sections (`.pos`), one red: `#c4221a` on opal, `#ff4a3d` on stock (both 4.5:1). Muted text `#4a4a46` on opal, `#a9a9a3` on stock.
-- Red marks only the current thing: the active nav link, the playhead, the primary button on hover, the hero frame. Never decoration.
+- Opal `#ecede9` ground, stock `#0b0b0b` ink and dark sections (`.pos`), one red: `#c4221a` on opal, `#ff4a3d` on stock (both 4.5:1). Muted text `#4a4a46` on opal, `#a9a9a3` on stock. Opal, ink and the opal red are also the plot look's `paper` palette, so the plot film and the page are one sheet.
+- Red marks only the current thing: the active nav link, the playhead, the cut, the primary button on hover, and in the plot film the live nets after power-on. Never decoration.
 
 ## Shape
 
 - Radius: 6 px on buttons and inputs, 8 px on panels and the terminal, 0 on film frames (film has square corners).
 - Lines: 1 px at 14 % or 30 % ink. No double rules, no zone grids, no title blocks outside the drawing.
 
-## The drawing
+## The cut
 
-One section on home (`#drawing`) is a real engineering drawing of the Glasgow board, white line on blueprint blue. It is the only place the blue appears.
+Home opens on one stage that holds for three shots (`#film`, `src/cut/`). It is the product's claim made visible: the same board file, in three looks.
 
-- Ground `#123f86`, ink `#eaf1ff`. Nothing else on the site uses them.
-- Every view comes from the board file: plan, front elevation, a live section A-A, Detail B of one solder joint, a parts list keyed to patent numerals, and a title block. Stackup thicknesses, finish, mask, rev and counts are read from `glasgow.kicad_pcb`; part heights are estimated (note 4 on the sheet says so).
-- Drafting rules: ISO 128 line weights (thick 0.6, thin 0.3, fine 0.16 sheet mm), ISO 129 dimensions with filled arrows, third-angle projection, a different hatch per material, thin copper drawn solid. Zone grids and the title block belong to the sheet, so they are allowed there.
-- Lettering: NewStroke, the same face as every heading on the site.
-- Motion: the sheet plots in stroke by stroke once, then a pinned camera travels sheet, plan, section, detail and title block on scroll, and comes back to the plan. The plot is tied to scroll as well as time: it is complete before the camera leaves the first view, so a fast scroller never sees a half-drawn sheet. Back on the plan, the Glasgow glyph film fades in over the drawn board on its plan act (its plan placed on the drawn outline: line drawing to type, plan to plan) and opens out as the blue sinks to stock. That film is the glyph look's own canvas: as the looks scroll in, it slides behind their heading and lands in its frame, so the page never shows the same film twice. Both looks show Glasgow. That hand-off is the product's claim: the same file, as a film. The section cut follows the pointer over the plan and sweeps the dense band around the FPGA when idle. Reduced motion: no plot, no sweep, and the camera cuts between stops.
-- Outside the sheet, the drawing's language appears only as dimensions that carry real data (`.dim` in `home.css`: a thin line, filled arrows, the value above the line). Under each look, a dimension chain shows the film's steps on its 24-beat score (`TRACE_ACTS` from choreo, the glyph `acts` from `data/site.ts`). A red playhead marks the current beat, and a click plays on from a step. The board picker draws each board's plan from its file (outline, front parts, the hero part in red, mounting holes; `figure/outlines.mts` writes `src/blueprint/outlines.json`) with its true width dimensioned under it. The aspect picker draws the four output frames on one scale (1920 px is 96 px, from `ASPECT_SIZE`) with their pixel widths dimensioned. The palette picker shows the monitor's film in each palette, at the same still frame reduced motion holds (`drawStill`). On the command's monitor, two dimensions show the output size in pixels for the selected aspect (`ASPECT_SIZE`).
-- Phone: a portrait screen cannot read the whole sheet, so the camera opens on the plan and moves in close to the hero chip before the section.
-- Code: `src/blueprint/draw.ts` draws (pure strings), `src/motion/drawing.ts` runs it, `figure/blueprint.mts` regenerates the data.
+- Two films of Glasgow share one camera: the **plot** film, drawn live in the page from its timeline (`public/films/plot/`, written by `scripts/plot-timelines.mts`), and the **trace** film as video (`public/films/cut/`). Both are compiled with the same config and part models, so they register to the pixel. Re-render both together or the cut tears.
+- One WebGL2 shader (`cut-gl.ts`) composites them across a straight cut: plot on the paper side, trace on the stock side, a red hairline on the cut itself. On arrival the plot sweeps in and the cut slides in carrying the lit board. Fine grain unifies the two; film edges are feathered so a frame edge never shows as a line.
+- Shots: hero (the held poster; on windows narrower than 16:9 the board moves aside so the words stay on paper), every frame (the cut wipes off and scroll runs the plot film under a strip of its real frames), three looks (scroll reveals them in order: plot alone, the trace cut sweeps in, then the glyph cut, each label arriving with its look).
+- Words on the stage print in `mix-blend-mode: difference`: ink on the paper, paper on the film.
+- Reduced motion: no sweep, no slide-in, no grain; the shots and the reveal still follow scroll. Without WebGL2 the trace poster stands in.
+
+The hero carries the one way in: the `git clone` line with its copy button. GitHub and its star count live in the header (read at build time; the count drops out if GitHub does not answer). The words stay on the paper side of the cut at every width.
+
+The footer bench is the same drawing language: paper faces and one ink line, with only the film, the screen and the board on it left black. Its SVG (`public/figure/bench.svg`, 619 KB) is fetched as the footer comes near, never inlined.
 
 ## Motion tokens
 
@@ -62,11 +63,7 @@ Hover: a button's fill deepens (ink to red) or an outline fills with a 6 % tint;
 
 ## Components
 
-- Button: `.btn` (outlined) and `.btn--solid` (filled, one a screen), 44 px tall, 38 px in the header.
+- Button: `.btn` (outlined) and `.btn--solid` (filled, one a screen), 44 px tall, 40 px in the header.
 - Link: `.prose-link`, underline drawn on hover.
 - Terminal: `.term`, the command with a copy button.
 - Small label: `.silk`, only beside a bare value.
-
-## The loader
-
-On a first visit to home only: the mark draws itself on stock, a film strip under it fills frame by frame with the real load progress, then the mark lands in the header. Under 2 s, skipped on repeat visits, under reduced motion and on any input.

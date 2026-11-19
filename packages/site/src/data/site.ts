@@ -4,6 +4,7 @@ export const site = {
   name: 'silk reel',
   url: 'https://silkreel.hridya.tech',
   repo,
+  line: 'KiCad in. Film out.',
   title: 'silk reel: release films from KiCad boards',
   description: "Give silk reel a KiCad board file and it renders a release film from the board's real copper, parts and silkscreen. MP4, GIF, WebM or ProRes.",
   author: { '@type': 'Person', '@id': 'https://www.hridya.tech/#person', name: 'Hridya Agrawal', url: 'https://www.hridya.tech' },

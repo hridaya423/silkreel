@@ -43,6 +43,24 @@ export function setupStudio() {
   const busySay = $('[data-busy-say]', root)
 
   const preview = createPreview(canvas)
+  const drawPreview = (timeline: Timeline, f: number) => {
+    preview.draw(timeline.style === 'trace' ? { ...timeline, transparent: true } : timeline, f)
+    if (timeline.style === 'trace') {
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'destination-over'
+        ctx.shadowColor = 'rgb(11 11 11 / 0.16)'
+        ctx.shadowBlur = 28
+        ctx.shadowOffsetY = 12
+        ctx.drawImage(canvas, 0, 0)
+        ctx.shadowColor = 'transparent'
+        ctx.fillStyle = '#e6e7e2'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.restore()
+      }
+    }
+  }
   const worker = new Worker(new URL('./studio.worker.ts', import.meta.url), { type: 'module' })
   const send = (m: ToWorker) => { worker.postMessage(m) }
 
@@ -51,7 +69,7 @@ export function setupStudio() {
   const sample = boards.find((b) => b.id === q.get('board'))
   const state: State = {
     board: sample?.id ?? 'glasgow',
-    style: q.get('style') === 'trace' ? 'trace' : q.get('style') === 'glyph' ? 'glyph' : 'plot',
+    style: q.get('style') === 'plot' ? 'plot' : q.get('style') === 'glyph' ? 'glyph' : 'trace',
     aspect: (['4:5', '1:1', '9:16', '16:9'] as const).find((a) => a === q.get('aspect')) ?? '16:9',
     palette: (['mono', 'copper', 'blueprint', 'phosphor'] as const).find((p) => p === q.get('palette')) ?? 'mono',
     accent: /^#[0-9a-f]{6}$/i.test(q.get('accent') ?? '') ? q.get('accent') ?? ACCENT : ACCENT,
@@ -291,7 +309,7 @@ export function setupStudio() {
     if (!dirty && f === drawn) return
     dirty = false
     drawn = f
-    preview.draw(tl, f)
+    drawPreview(tl, f)
     paintRead(tl, f)
   })
 
@@ -332,7 +350,12 @@ export function setupStudio() {
   const sampleSel = root.querySelector<HTMLSelectElement>('[data-sample]')
   const wide = matchMedia('(min-width: 961px)')
   let mode: 'empty' | 'ready' = 'ready'
-  const paintSample = () => { if (sampleSel) sampleSel.value = mode === 'empty' ? '' : state.board }
+  const source = $('[data-source]', root)
+  const filename = $('[data-filename]', root)
+  const paintSample = () => {
+    if (sampleSel) sampleSel.value = mode === 'empty' ? '' : state.board
+    if (filename) filename.textContent = isOwn() ? own?.file ?? '' : `${state.board}.kicad_pcb`
+  }
   const setMode = (m: 'empty' | 'ready') => {
     mode = m
     root.dataset.mode = m
@@ -351,7 +374,7 @@ export function setupStudio() {
     ready = `${boardName()} is ready.`
     paintControls(); paintParts(); recompile(true)
   }
-  sampleSel?.addEventListener('change', () => { if (sampleSel.value) pickBoard(sampleSel.value) })
+  sampleSel?.addEventListener('change', () => { if (sampleSel.value) { pickBoard(sampleSel.value); source?.hidePopover() } })
 
   const fileInput = root.querySelector<HTMLInputElement>('[data-file]')
   const takeFile = (file: File | undefined) => {
@@ -370,12 +393,12 @@ export function setupStudio() {
       ready = `${stats.name} is ready.`
       paintControls(); paintParts(); recompile(true)
     }, (err: unknown) => {
-      showBusy(false); setMode('empty')
+      showBusy(false); setMode(tl ? 'ready' : 'empty')
       const detail = why(err)
       fail(detail || `Could not read ${file.name}.`)
     })
   }
-  for (const b of root.querySelectorAll('[data-pick]')) b.addEventListener('click', () => { fileInput?.click() })
+  for (const b of root.querySelectorAll('[data-pick]')) b.addEventListener('click', () => { source?.hidePopover(); fileInput?.click() })
   fileInput?.addEventListener('change', () => { takeFile(fileInput.files?.[0]); fileInput.value = '' })
   addEventListener('dragover', (e) => { e.preventDefault(); root.classList.add('is-over') })
   addEventListener('dragleave', (e) => { if (e.relatedTarget === null) root.classList.remove('is-over') })
@@ -416,7 +439,7 @@ export function setupStudio() {
     if (accentReset) accentReset.hidden = !state.useAccent
     if (liveNote) {
       liveNote.hidden = state.style !== 'trace'
-      liveNote.textContent = 'A draft preview. The full trace film, with its sound, renders on your machine.'
+      liveNote.textContent = 'Browser draft. Render locally for full quality and sound.'
     }
     if (paletteName) paletteName.textContent = cap(state.palette)
     if (lookUse) lookUse.textContent = root.querySelector(`[name="style"][value="${state.style}"] ~ .st__look-t`)?.textContent ?? ''
@@ -481,7 +504,7 @@ export function setupStudio() {
 
   stillBtn?.addEventListener('click', () => {
     if (!tl) return
-    preview.draw(tl, Math.floor(frame))
+    drawPreview(tl, Math.floor(frame))
     const name = `${fileBase()}.png`
     canvas.toBlob((b) => { if (b) { download(b, name); toast(`Saved ${name}.`) } }, 'image/png')
   })

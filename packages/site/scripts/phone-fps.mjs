@@ -2,7 +2,7 @@
 // instead of SwiftShader, from the top, inside the gate and at the foot. node scripts/phone-fps.mjs <url>
 import { chromium } from 'playwright'
 const url = process.argv[2]
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
+const browser = await chromium.launch({ channel: 'chrome', chromiumSandbox: true, headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
 const page = await ctx.newPage()
 const cdp = await ctx.newCDPSession(page)

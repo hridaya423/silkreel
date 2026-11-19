@@ -203,8 +203,10 @@ describe('placements', () => {
             expect(Number.isFinite(a.rot)).toBe(true)
             expect(a.scale).toBeGreaterThan(0)
             // every off-axis atom has a symmetry twin (mirror across Y, or the
-            // rot2 180° partner); authored single cells all sit on the axis
-            if (Math.abs(a.x) < 1e-9) continue
+            // rot2 180° partner); authored single cells all sit on the axis,
+            // except the field's, which stand at the board's true places, and the
+            // plan's main chip, drawn once
+            if (Math.abs(a.x) < 1e-9 || p.stage !== undefined || (p.role === 'hero' && p.glyphId.startsWith('cell:')) || tl.formations.find((f) => f.beat === p.formation)?.id === 'name') continue
             const twin = p.atoms.some(
               (b) =>
                 b !== a &&
@@ -215,13 +217,13 @@ describe('placements', () => {
           }
         }
         // every act contributes placements
-        expect([...acts].sort()).toEqual([0, 1, 2])
+        expect([...acts].sort()).toEqual([0, 1, 2, 3, 4, 5])
       })
 
-      it(`${name} @ ${aspect}: formations are the three acts — sorted, non-empty windows`, () => {
+      it(`${name} @ ${aspect}: formations are the five acts — sorted, non-empty windows`, () => {
         const tl = compile(boardModel(name), { aspect })
         const ids = tl.formations.map((f) => f.id)
-        expect([...ids].sort()).toEqual(['frame', 'plan', 'route'])
+        expect([...ids].sort()).toEqual(['cluster', 'diagonal', 'field', 'name', 'plan', 'route'])
         for (const [i, f] of tl.formations.entries()) {
           expect(f.startPhase).toBeGreaterThanOrEqual(0)
           expect(f.startPhase).toBeLessThan(1)
@@ -271,7 +273,8 @@ describe('placements', () => {
         const cx = safe.x + safe.w / 2
         const cy = safe.y + safe.h / 2
         const byId = new Map(tl.cast.map((g) => [g.id, g]))
-        for (const p of tl.placements) {
+        // the field stands with its chip at the origin and the camera centres it at its lock; glyph-cam.test.ts holds it in frame there
+        for (const p of tl.placements.filter((q) => q.stage === undefined && q.glyphId !== 'txt:title')) {
           const g = byId.get(p.glyphId)
           // the glyph's own extent around the atom centre — words run wide
           const word = g?.kind === 'text' ? (g.text ?? '') : ''

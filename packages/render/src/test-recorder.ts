@@ -62,13 +62,27 @@ export class RecordingCtx {
 
   install(target: Record<string, unknown>): void {
     const methods = [
-      'setTransform', 'fillRect', 'clearRect', 'save', 'restore',
+      'setTransform', 'fillRect', 'strokeRect', 'clearRect', 'save', 'restore',
       'translate', 'scale', 'rotate',
       'stroke', 'fill', 'fillText', 'strokeText',
       'beginPath', 'closePath', 'moveTo', 'lineTo', 'quadraticCurveTo', 'arc', 'rect', 'roundRect',
       'setLineDash', 'drawImage', 'clip'
     ]
     for (const m of methods) target[m] = this.forward(m)
+    let t = [1, 0, 0, 1, 0, 0]
+    const saved: number[][] = []
+    const send = this.forward.bind(this)
+    const mulT = (n: number[]): void => {
+      const [a, b, c, d, e, f] = t as [number, number, number, number, number, number]
+      t = [a * (n[0] as number) + c * (n[1] as number), b * (n[0] as number) + d * (n[1] as number), a * (n[2] as number) + c * (n[3] as number), b * (n[2] as number) + d * (n[3] as number), a * (n[4] as number) + c * (n[5] as number) + e, b * (n[4] as number) + d * (n[5] as number) + f]
+    }
+    target.setTransform = (...args: unknown[]): void => { t = args.map(Number); send('setTransform')(...args) }
+    target.save = (): void => { saved.push(t); send('save')() }
+    target.restore = (): void => { t = saved.pop() ?? t; send('restore')() }
+    target.translate = (...args: unknown[]): void => { mulT([1, 0, 0, 1, Number(args[0]), Number(args[1])]); send('translate')(...args) }
+    target.scale = (...args: unknown[]): void => { mulT([Number(args[0]), 0, 0, Number(args[1]), 0, 0]); send('scale')(...args) }
+    target.rotate = (...args: unknown[]): void => { const r = Number(args[0]); mulT([Math.cos(r), Math.sin(r), -Math.sin(r), Math.cos(r), 0, 0]); send('rotate')(...args) }
+    target.getTransform = (): { a: number; b: number; c: number; d: number; e: number; f: number } => ({ a: t[0] as number, b: t[1] as number, c: t[2] as number, d: t[3] as number, e: t[4] as number, f: t[5] as number })
     target.createLinearGradient = (): { addColorStop: (offset: number, color: string) => void } => ({
       addColorStop: (offset: number, color: string) => {
         this.calls.push({ method: 'gradient-stop', args: [offset, color] })
@@ -82,7 +96,7 @@ export class RecordingCtx {
     const props = ['fillStyle', 'strokeStyle', 'shadowColor', 'shadowBlur', 'globalAlpha', 'lineWidth', 'lineCap', 'lineJoin', 'font', 'textAlign', 'textBaseline', 'filter', 'globalCompositeOperation']
     for (const p of props) {
       Object.defineProperty(target, p, {
-        get: () => this.props[p],
+        get: () => this.props[p] ?? (p === 'filter' ? 'none' : undefined),
         set: (v: unknown) => {
           this.set(p, v)
         },
@@ -95,7 +109,9 @@ export class RecordingCtx {
       height: this.canvas.height
     })
     target.putImageData = this.forward('putImageData')
-    target.getTransform = (): { a: number } => ({ a: 1 })
+    target.measureText = (text: string): { width: number } => ({
+      width: text.length * 0.6 * Number.parseFloat(typeof this.props.font === 'string' ? this.props.font : '10')
+    })
   }
 }
 

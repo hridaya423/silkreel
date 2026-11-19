@@ -1,7 +1,8 @@
 import type { Timeline } from '@silk-reel/choreo'
 import { buildScene, drawFrame, postOptionsFor } from './film'
+import { createGlyphFilm } from './glyph-film'
+import type { GlyphFilmDraw } from './glyph-film'
 import type { Scene } from './film'
-import { drawAnnotations } from './FilmComponent'
 import { loadFont } from './font'
 import { createPost } from './post'
 import type { Post } from './post'
@@ -21,6 +22,7 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
   let post: Post | null | undefined
   let trace: { gl: TraceGL; w: number; h: number } | null = null
   let glyph: { tl: Timeline; scene: Scene; off: HTMLCanvasElement } | null = null
+  let film: { draw: GlyphFilmDraw; w: number; h: number } | null = null
 
   const traceFor = (w: number, h: number) => {
     if (trace?.w === w && trace.h === h) return trace.gl
@@ -40,8 +42,7 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
         if (gl) {
           target.clearRect(0, 0, tl.width, tl.height)
           target.drawImage(gl.render(tl, frame), 0, 0)
-          drawAnnotations(target, gl.annotations(), tl.width, tl.height)
-          drawTitle(target, tl, frame / tl.totalFrames, 1)
+          drawTitle(target, tl, frame / tl.totalFrames)
           return
         }
       }
@@ -50,6 +51,11 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
         off.width = tl.width
         off.height = tl.height
         glyph = { tl, scene: buildScene(tl), off }
+      }
+      if (tl.style === 'glyph') {
+        if (film?.w !== tl.width || film.h !== tl.height) film = { draw: createGlyphFilm(tl.width, tl.height), w: tl.width, h: tl.height }
+        film.draw(target, tl, glyph.scene, frame)
+        return
       }
       const ctx = glyph.off.getContext('2d')
       if (!ctx) return

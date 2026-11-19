@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs'
 const [url, out, stops] = process.argv.slice(2)
 const opt = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d }
 mkdirSync(out, { recursive: true })
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
+const browser = await chromium.launch({ channel: 'chrome', chromiumSandbox: true, headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const page = await browser.newPage({ viewport: { width: +opt('--width', 1440), height: +opt('--height', 900) }, reducedMotion: process.argv.includes('--reduced') ? 'reduce' : 'no-preference' })
 page.on('pageerror', (e) => console.log('pageerror', e.message))
 page.on('console', (m) => { if (m.type() === 'error' && !/504|Outdated/.test(m.text())) console.log('console', m.text()) })

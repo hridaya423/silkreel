@@ -10,6 +10,12 @@ export interface FilmInputProps {
   grain?: boolean
   /** trace render quality: 'final' (default) or 'draft' */
   quality?: RenderQuality
+  /** final trace renders: accumulation samples per frame */
+  samples?: number
+  /** look tests: tone curve and studio */
+  look?: { tonemap?: 'aces' | 'neutral' | 'agx'; studio?: 'dark' | 'high' }
+  /** trace only: render the board-and-parts matte instead of the picture */
+  matte?: boolean
 }
 
 function readInputProps(source: unknown): FilmInputProps {
@@ -20,13 +26,16 @@ function readInputProps(source: unknown): FilmInputProps {
   return {
     timeline: props.timeline,
     ...(props.grain !== undefined ? { grain: props.grain } : {}),
-    ...(props.quality !== undefined ? { quality: props.quality } : {})
+    ...(props.quality !== undefined ? { quality: props.quality } : {}),
+    ...(props.samples !== undefined ? { samples: props.samples } : {}),
+    ...(props.look !== undefined ? { look: props.look } : {}),
+    ...(props.matte !== undefined ? { matte: props.matte } : {})
   }
 }
 
 const EntryFilm: React.FC<Record<string, unknown>> = (props) => {
-  const { timeline, grain, quality } = readInputProps(props)
-  return <Film timeline={timeline} grain={grain ?? true} {...(quality !== undefined ? { quality } : {})} />
+  const { timeline, grain, quality, samples, look, matte } = readInputProps(props)
+  return <Film timeline={timeline} grain={grain ?? true} {...(quality !== undefined ? { quality } : {})} {...(samples !== undefined ? { samples } : {})} {...(look !== undefined ? { look } : {})} {...(matte !== undefined ? { matte } : {})} />
 }
 
 const Root: React.FC = () => {

@@ -34,7 +34,7 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
       { flag: '--style', text: '`trace` films the lit board. `plot` draws the same film in pen on paper. `glyph` sets its footprints as type in a loop.', values: ['`trace`', '`plot`', '`glyph`'], def: '`trace`' },
       { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`copper` for trace, `paper` for plot, `mono` for glyph' },
       { flag: '--accent', text: 'One highlight colour: the growing copper tips on trace, the main chip on glyph.', values: ['`#rrggbb`'], def: 'The palette’s own' },
-      { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The IC with the most pads' },
+      { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The chip that carries the most signals' },
       { flag: '--mask', text: 'The solder mask colour on trace.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
     ]
   },
@@ -57,7 +57,7 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     rows: [
       { flag: '-o', text: 'Where the film is saved.', values: ['A file path'], def: 'Next to the board, as `board-trace-4x5.mp4`' },
       { flag: '--format', text: 'The file type.', values: ['`mp4`', '`gif`', '`webm-alpha`', '`prores-alpha`'], def: '`mp4`' },
-      { flag: '--no-audio', text: 'Leaves out the score that trace and plot films carry.', def: 'Off' },
+      { flag: '--no-audio', text: 'Leaves out the score that a trace film carries.', def: 'Off' },
       { flag: '--draft', text: 'Renders faster at lower quality, to check a look before the final render.', def: 'Off' },
       { flag: '--help', text: 'Lists every flag.', def: 'Off' }
     ]
@@ -234,7 +234,10 @@ const env = [
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (!e.isIntersecting) continue
-      links.forEach((l) => { l.toggleAttribute('aria-current', l.dataset.toc === e.target.id) })
+      links.forEach((l) => {
+        if (l.dataset.toc === e.target.id) l.setAttribute('aria-current', 'location')
+        else l.removeAttribute('aria-current')
+      })
       // on a phone the strip keeps the current section in sight
       const on = links.find((l) => l.dataset.toc === e.target.id)
       const strip = on?.closest('ol')

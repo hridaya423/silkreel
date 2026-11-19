@@ -14,6 +14,9 @@ export const DEMO_BOARDS = [
   'icebreaker',
   'glasgow'
 ] as const
+export const DEMO_TITLES: Record<string, string> = {
+  glasgow: 'Glasgow', icebreaker: 'iCEBreaker', StickHub: 'StickHub', 'ecc83-pp': 'ECC83 PP', video: 'Video', 'kit-dev-coldfire-xilinx_5213': 'ColdFire Xilinx Dev Kit'
+}
 export type DemoBoardId = (typeof DEMO_BOARDS)[number]
 
 export function isDemoBoardId(value: string): value is DemoBoardId {

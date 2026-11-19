@@ -4,7 +4,7 @@
 // thumbnails (max-pooled, so hairline copper survives downsampling) — enough
 // evidence to fill in notes.md without eyeballing PNGs, and to catch real
 // problems (dead air, clipping, stalls, washed-out palette) numerically.
-// usage: npx tsx scripts/review-stats.mts [review/<stamp>] [--ascii]
+// usage: npx tsx scripts/review-stats.mts [review/<stamp>]
 import { readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { probeVideo, decodeGrayFrames } from '../packages/metrics/src/decode.js'
@@ -15,11 +15,10 @@ import { loadDemoBoard, defaultFilmConfig } from '../packages/render-api/src/boa
 
 const root = path.resolve(import.meta.dirname, '..')
 const argv = process.argv.slice(2)
-const asciiOnly = argv.includes('--ascii')
 const dirArg = argv.find((a) => !a.startsWith('--'))
 const dir = dirArg !== undefined
   ? path.resolve(dirArg)
-  : path.join(root, 'review', readdirSync(path.join(root, 'review')).sort().at(-1) as string)
+  : path.join(root, 'review', readdirSync(path.join(root, 'review')).filter((name) => /^\d{4}-\d{2}-\d{2}T/.test(name)).sort().at(-1) as string)
 
 const SAMPLE_P = [0.03, 0.08, 0.15, 0.35, 0.55, 0.73, 0.82, 0.9, 0.975]
 const DEAD_LIT = 0.08 // litPct below this counts as near-empty
@@ -65,7 +64,8 @@ async function sceneStats(boardId: string, style: string, aspect: string): Promi
   const board = await loadDemoBoard(boardId)
   const tl = compileTimeline(board, { ...defaultFilmConfig(boardId), style, aspect } as never)
   const base = `${tl.width}x${tl.height} ${tl.durationSeconds}s/${tl.totalFrames}f warn=[${tl.warnings.map((w) => w.code).join(',')}]`
-  if (tl.style !== 'trace') return `${base} glyph cast=${tl.cast.length}`
+  if (tl.style === 'glyph') return `${base} glyph cast=${tl.cast.length}`
+  if (tl.style !== 'trace') return base
   const t = tl as TraceTimeline
   const widths: number[] = []
   const perLayer: string[] = []
@@ -178,7 +178,7 @@ async function videoStats(file: string): Promise<void> {
   console.log(`  lit% @p: ${spark} | peak ${f2(peak)}% @p=${f2(p(peakAt))} plateau>=90%: ${f2(plateau / facts.fps)}s`)
   console.log(`  hook: firstLit f${firstLit} (${f2(firstLit / facts.fps)}s) lit@0.5s=${f2(litAt(0.5))}% lit@1s=${f2(litAt(1))}%`)
   console.log(`  dead-air: ${deadFrames}f (${f2((deadFrames / n) * 100)}%) longest ${deadLongest}f @p=${f2(p(deadWorstAt))}`)
-  console.log(`  motion: meanDiff=${f2(motion)} stalls>${7}f: ${stallLongest}f@p=${f2(p(stallAt))} maxDiff=${f2(diffMax)} @p=${f2(p(diffMaxAt))}`)
+  console.log(`  motion: meanDiff=${f2(motion)} longest stall: ${stallLongest}f@p=${f2(p(stallAt))} maxDiff=${f2(diffMax)} @p=${f2(p(diffMaxAt))}`)
   console.log(`  seam: first<->last=${f2(seam)} lit(first)=${f2(lit[0] ?? 0)}% lit(last)=${f2(lit[n - 1] ?? 0)}%`)
   if (hb !== undefined) {
     console.log(`  comp@hold: bbox ${hb.x0},${hb.y0}-${hb.x1},${hb.y1} = ${hb.x1 - hb.x0}x${hb.y1 - hb.y0}px covers ${f2(coverPct)}% of safe ${safe.w}x${safe.h} centroid ${f2(hc.x)},${f2(hc.y)} vs ${facts.width / 2},${facts.height / 2} edge-touch frames=${edgeTouch}`)
@@ -213,4 +213,3 @@ for (const f of mp4s) {
   }
   await videoStats(path.join(dir, f))
 }
-void asciiOnly

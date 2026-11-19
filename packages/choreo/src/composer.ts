@@ -1,16 +1,20 @@
 import type { BoardModel, Vec2 } from '@silk-reel/ingest'
-import { boardCore, frameAct, heroPart, planAct, routeAct } from './acts'
-import type { ActPlan, Cell, Role, Room } from './acts'
+import { fieldAct, fieldFit, heroPart, planAct, routeAct } from './acts'
+import { clusterAct, diagonalAct } from './board-acts'
+import { boardTitle } from './board-title'
+import { nameAct } from './name-act'
+import type { ActPlan, Box, Cell, Role, Room } from './acts'
 import { CELL_KINDS, cellGlyph, cellId, heroChip, takeCensus } from './cells'
 import type { CellKind, Census } from './cells'
-import { DECODE_IN } from './decode'
+import { DECODE_IN, DECODE_OUT } from './decode'
 import { mod } from './curves'
-import { buildCast, REFDES, VALUE } from './glyphs'
+import { buildCast } from './glyphs'
 import { safeArea } from './layout'
 import { makeRng } from './rng'
 import type { Rng } from './rng'
+import { GLYPH_ADDED_BEATS, GLYPH_FILM_BEATS, GLYPH_LOOP_BEATS } from './config'
 import type { ResolvedConfig } from './config'
-import type { AtomState, FormationEvent, Glyph, Placement, TimelineWarning, Tone } from './types'
+import type { AtomState, FormationEvent, Glyph, GlyphEvent, Placement, TimelineWarning, Tone } from './types'
 
 /**
  * The loop is a score on a 15fps decode grid. Nothing ever moves: cells
@@ -22,28 +26,109 @@ import type { AtomState, FormationEvent, Glyph, Placement, TimelineWarning, Tone
  */
 
 const DECODE_IN_STEPS = DECODE_IN[0]?.length ?? 5
-/** a full loop is 24 beats (168 steps, 11.2s) */
-const LOOP_BEATS = 24
+const DECODE_OUT_STEPS = DECODE_OUT[0]?.length ?? 6
+/** the share of a fast-grown act, nearest its seeds, that writes on its first step, so it never opens on one part alone */
+const FIRST_PULSE_SHARE = 0.25
+/** the write-ins that show ink on their first step and blink at different steps, so a fast-grown act never blinks out whole */
+const FULL_FIRST_PATTERNS = DECODE_IN.flatMap((p, i) => ((p[0] ?? 0) > 0 ? [i] : []))
+const LOOP_BEATS = GLYPH_LOOP_BEATS
 /** one lattice pitch in stage units (stage ±1 = half the safe short side) */
 const PITCH = 0.085
+/** no mark of a formation writes in within this distance, in stage units, of a mark of the formation before it that still stands */
+export const GLYPH_CLEAR = 2 * PITCH
 /** how much of each stage half-axis the structures may claim */
 const FILL = 0.71
 
 interface ActTiming {
-  /** seed marks appear (may be negative — wraps) */
-  seeds: number
   grow: [number, number]
   strip: [number, number]
+  /** the hold starts breathing here; at the end of the growth when absent */
+  breath?: number
 }
 
-/** in beats; the frame act holds longest — it is the climax */
+/**
+ * In beats; the field holds longest — it is the last scene. The routes write
+ * in only after it has held: no act is ever drawn over another, so the field
+ * strips inward to the main chip just ahead of the routes. The plan leaves a
+ * beat earlier than the field starts, and the field is built in stages timed
+ * by its own cells (`Cell.land`), so its grow window ends on its lock.
+ */
 const SCORE: ActTiming[] = [
-  { seeds: -1.4, grow: [0, 3.6], strip: [6.2, 8.7] },
-  { seeds: 6.9, grow: [8, 11.4], strip: [14.2, 16.7] },
-  { seeds: 14.9, grow: [16, 19.6], strip: [22.2, 24.8] }
+  { grow: [13 / 7, 16 / 7], strip: [7, 7], breath: 3.6 },
+  { grow: [8, 8 + 6 / 7], strip: [12.7, 12.7] },
+  { grow: [96 / 7, 14], strip: [124 / 7, 124 / 7] },
+  { grow: [131 / 7, 134 / 7], strip: [161 / 7, 161 / 7] },
+  { grow: [161 / 7, 196 / 7], strip: [219 / 7, 219 / 7] },
+  { grow: [227 / 7, 238 / 7], strip: [LOOP_BEATS + 1, LOOP_BEATS + 1] }
 ]
+const FIELD_ACT = 4
 /** where frame 0 sits in the score: just after the routes complete */
 const OPEN_BEAT = 4
+/** the glyph hairline in pixels on a frame whose short side is 1080 */
+export const GLYPH_INK = 2
+/** a glyph's stroke on screen is this many times its ink at any camera scale */
+export const GLYPH_INK_SCALE = 1.25
+/** two plan outlines keep three line weights of dark between their strokes, so four between their centre lines */
+const PLAN_GAP_WEIGHTS = 4
+/** a label keeps this share of the frame's short side from every edge */
+export const LABEL_MARGIN = 0.04
+/** each tone's depth layer: it scales by 1 + 0.09 z and drifts by 1 + 0.9 z */
+export const GLYPH_Z: Record<Tone, number> = { hero: 1, text: 0.4, support: 0, punct: -1 }
+/** the plan's and the routes' hairline is at least this many pixels when the film plays 390 px wide, so their outlines read on a phone; the field is dense enough without */
+const PHONE_INK = 0.7
+const PHONE_INK_ACTS = new Set(['plan', 'route', 'diagonal', 'cluster', 'name'])
+const PHONE_WIDTH = 390
+/** the push before the last scene ends with the main chip this share of the frame's width */
+export const GLYPH_CHIP_SHARE = 1 / 3
+/** a part at least this share of the main chip's size is one of its size */
+const CHIP_LIKE = 0.7
+/** steps before the cut where the parts of the chip's size that the push's last frame would show write out */
+const CHIP_CLEAR_STEPS = 9
+/** frames before the last scene's first beat where the camera cuts to its close start; the formation before holds whole to that frame */
+export const GLYPH_CUT_EARLY = 4
+/** a formation's lock is an event of its own only this many seconds clear of a formation starting or the name landing */
+const LOCK_CLEAR = 0.4
+/** a pull lands this many frames before the dive at the latest, and lasts at least PULL_LEAST frames, starting before its formation writes in when that comes late */
+const PULL_CLEAR = 12
+const PULL_LEAST = 42
+/** a pull that changes the scale by less than this share keeps to its formation's own frames, so a handover stays at one scale */
+const PULL_SMALL = 0.03
+/** the share of the frame's edge the field keeps clear of the drift and roll */
+const FIELD_MARGIN = 0.06
+/** a text glyph on several lines: each line's baseline sits this many sizes under the one before */
+export const GLYPH_NAME_LEADING = 1.15
+/** the camera's scale where it is widest, as the last formation holds */
+export const GLYPH_WIDE = 1.32
+/** a pull lands on the scale the glide had this many frames before the lock, so the landing is never wider than the glide */
+export const LAND_EARLY = 6
+
+const ease = (u: number): number => {
+  const t = Math.min(1, Math.max(0, u))
+  return t * t * (3 - 2 * t)
+}
+const mix = (a: number, b: number, u: number): number => a + (b - a) * u
+
+const GLIDE_FIRST = 4.08
+const GLIDE_MIDDLE = 12 + GLYPH_ADDED_BEATS
+const GLIDE_LAST = 19.2 + GLYPH_ADDED_BEATS
+/** the camera's scale as one unbroken glide over the score's share p: the approved film's camera, its middle stretched over the beats the film gained, so the routes open and the field ends as they did; the pulls never go wider than it */
+export const glide = (p: number): number => {
+  const b = p * LOOP_BEATS
+  if (b < GLIDE_FIRST) return mix(3.1, 2.3, ease(b / GLIDE_FIRST))
+  if (b < GLIDE_MIDDLE) return mix(2.3, 1.75, ease((b - GLIDE_FIRST) / (GLIDE_MIDDLE - GLIDE_FIRST)))
+  return mix(1.75, GLYPH_WIDE, ease((b - GLIDE_MIDDLE) / (GLIDE_LAST - GLIDE_MIDDLE)))
+}
+
+const BEAT_SECONDS = 11.2 / 24
+const DRIFT_KEEP = 6
+const DRIFT_FIELD = 11
+/** the clock the camera's slow drift and roll run on: round 17's to the plan's lock, round 17's shifted by the added beats from the field on, and slower between, so the routes, the plan and the field drift as they did */
+export const driftSeconds = (frame: number, fps: number): number => {
+  const b = frame / fps / BEAT_SECONDS
+  const late = DRIFT_FIELD + GLYPH_ADDED_BEATS
+  const t = b <= DRIFT_KEEP ? b : b >= late ? b - GLYPH_ADDED_BEATS : DRIFT_KEEP + ((b - DRIFT_KEEP) * (DRIFT_FIELD - DRIFT_KEEP)) / (late - DRIFT_KEEP)
+  return t * BEAT_SECONDS
+}
 
 const ROLE_SIZE: Record<Role, number> = {
   anchor: 0.95, body: 0.8, edge: 0.8, joint: 0.8, accent: 0.72, hero: 2.1, text: 0.5
@@ -60,6 +145,8 @@ export interface ComposeResult {
   cast: Glyph[]
   placements: Placement[]
   formations: FormationEvent[]
+  events: GlyphEvent[]
+  pulls: Array<[number, number]>
   steps: number
   cadence: 'twos' | 'smooth'
   warnings: TimelineWarning[]
@@ -125,11 +212,15 @@ function expand(cell: Cell, scale: number, text: boolean): AtomState[] {
 interface Unit {
   placement: Placement
   act: number
+  /** the steps its decode-in and decode-out begin, in its own act's time before the loop wraps them */
+  in: number
+  out: number
   /** lattice positions of every copy, for growth distances */
   sites: Vec2[]
   lag: number
   at?: number | undefined
   life?: number | undefined
+  land?: number | undefined
 }
 
 /** shortest growth distance from the seeds to every unit across the lattice */
@@ -168,27 +259,6 @@ function growthDistances(units: Unit[], seeds: Vec2[]): number[] {
 
 
 /**
- * Two short words off the board's own silk — net names, block labels — for
- * the frame act's captions. Hinted words lead; then short upper-case tokens,
- * front side and taller first, since those are the ones a designer labelled.
- */
-function boardWords(board: BoardModel, prefer: string[], rng: Rng): Glyph[] {
-  const seen = new Map<string, number>()
-  for (const [layerId, layer] of Object.entries(board.silkscreen)) {
-    for (const t of layer.texts) {
-      const v = t.value.trim()
-      if (v.length < 2 || v.length > 8 || /\s/.test(v) || REFDES.test(v) || VALUE.test(v) || !/[A-Za-z]/.test(v)) continue
-      const score = (layerId.startsWith('F.') ? 2 : 0) + (v === v.toUpperCase() ? 1.5 : 0) + Math.min(2, t.height) + rng.next() * 0.5
-      seen.set(v, Math.max(seen.get(v) ?? -Infinity, score + (prefer.includes(v) ? 100 : 0)))
-    }
-  }
-  return [...seen.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([v], i) => ({ id: `word:${i}:${v}`, kind: 'text', strokes: [], text: v }))
-}
-
-/**
  * order → 0..1 arrival fraction. Pure distance stalls on sparse stretches
  * (a frame's long empty edges); pure rank loses the shape of the wave. Half
  * of each keeps the direction and a steady cadence. Ties land together.
@@ -223,38 +293,65 @@ export function composeFilm(
     nx: Math.floor((FILL * Math.max(1, stageAspect)) / PITCH),
     ny: Math.floor((FILL * Math.max(1, 1 / stageAspect)) / PITCH)
   }
-  const steps = Math.round(durationSeconds * 15)
+  const steps = Math.round((durationSeconds * 15 * LOOP_BEATS) / GLYPH_FILM_BEATS)
+  const film = Math.round(durationSeconds * resolved.fps)
   const at = (b: number): number => Math.round((b * steps) / LOOP_BEATS)
 
-  // every act is the board: its hero's routes, its plan, the hero's neighbourhood
-  const hero = heroPart(board, resolved.hero, resolved.cast)
-  const coreRoom = { x: Math.min(room.nx - 3, 5), y: Math.min(room.ny - 3, 6) }
-  const core = boardCore(board, hero, coreRoom.x, coreRoom.y)
-  const heroPkg = (hero === undefined ? undefined : heroChip(board, hero.ref)) ??
-    bench.find((g) => g.kind === 'package')
-  const words = resolved.knobs.texts >= 0.5 ? boardWords(board, resolved.cast?.preferTexts ?? [], makeRng(seed, 'words')) : []
+  // every act is the board: its hero's routes, its plan, then the field, fitted to the frame at the camera's widest with the name below it
+  const hero = heroPart(board, resolved.hero ?? resolved.cast?.hero, resolved.cast)
+  const chip = hero === undefined ? undefined : heroChip(board, hero.ref, hero.rot)
+  const heroPkg = chip ?? bench.find((g) => g.kind === 'package')
+  // the field is fitted to the frame at the camera's scale on its lock, where the camera centres it with the name
+  const drawn = safeArea(resolved.width, resolved.height, false)
+  const drawnStage = 0.5 * Math.min(drawn.w, drawn.h)
+  const lockStep = at((SCORE[FIELD_ACT] as ActTiming).grow[1]) - at(OPEN_BEAT)
+  const atLock = glide((Math.round((lockStep * resolved.fps) / 15) - LAND_EARLY) / Math.round((steps * resolved.fps) / 15))
+  const pitchPx = PITCH * drawnStage * atLock
+  const lattice = (px: number, extent: number, centre: number, zoom = 1): number => ((px - extent / 2) / (atLock * zoom) + extent / 2 - centre) / (PITCH * drawnStage)
+  const fieldBox: Box = {
+    x0: lattice(FIELD_MARGIN * resolved.width, resolved.width, drawn.x + drawn.w / 2),
+    x1: lattice((1 - FIELD_MARGIN) * resolved.width, resolved.width, drawn.x + drawn.w / 2),
+    y0: lattice(FIELD_MARGIN * resolved.height, resolved.height, drawn.y + drawn.h / 2),
+    y1: lattice((1 - FIELD_MARGIN) * resolved.height, resolved.height, drawn.y + drawn.h / 2)
+  }
+  const whole = fieldFit(board, fieldBox)
+  const chipTurn = hero === undefined ? 0 : (-hero.rot * Math.PI) / 180 + (whole.turn ? Math.PI / 2 : 0)
+  const phoneInk = Math.max(1, (PHONE_INK * resolved.width) / PHONE_WIDTH / ((GLYPH_INK * Math.min(resolved.width, resolved.height)) / 1080))
+  const loop = Math.round((steps * resolved.fps) / 15)
+  const plan = SCORE[1] as ActTiming
+  const planFrame = (step: number): number => Math.round(((step - at(OPEN_BEAT)) * resolved.fps) / 15)
+  const planWidest = Math.min(glide(planFrame(at(plan.grow[0])) / loop), glide((planFrame(at(plan.grow[1]) + DECODE_IN_STEPS) - LAND_EARLY) / loop))
+  const planGap = (PLAN_GAP_WEIGHTS * GLYPH_INK_SCALE * GLYPH_INK * Math.min(resolved.width, resolved.height) * phoneInk) / 1080 / (PITCH * drawnStage * planWidest)
+  const view = (i: number): { nx: number; ny: number } => {
+    const s = glide((planFrame(at((SCORE[i] as ActTiming).grow[1]) + DECODE_IN_STEPS) - LAND_EARLY) / loop)
+    return { nx: resolved.width / 2 / (drawnStage * s * PITCH), ny: resolved.height / 2 / (drawnStage * s * PITCH) }
+  }
+  const diagonal = diagonalAct({ board, hero, heroGlyph: heroPkg, chipTurn, view: view(2), id: 'diagonal' })
   const acts: ActPlan[] = [
-    routeAct(board, room, hero, heroPkg?.id),
-    planAct(board, room, hero),
-    frameAct({ nx: room.nx, ny: room.ny }, core, heroPkg?.id, words.map((w) => w.id))
+    routeAct(board, room, hero, heroPkg, chip === undefined ? 0 : chipTurn),
+    planAct(board, room, hero, chipTurn, planGap),
+    diagonal,
+    clusterAct({ board, hero, heroGlyph: heroPkg, chipTurn, view: view(3), id: 'cluster', skip: new Set(diagonal.cells.flatMap((c) => (c.group === undefined ? [] : [c.group]))) }),
+    fieldAct(board, fieldBox, hero, (DECODE_IN_STEPS * LOOP_BEATS) / steps, whole.turn)
   ]
+  const field = acts[FIELD_ACT] as ActPlan
+  const span = (cells: Cell[]): Box => ({ x0: Math.min(...cells.map((c) => c.x)), x1: Math.max(...cells.map((c) => c.x)), y0: Math.min(...cells.map((c) => c.y)), y1: Math.max(...cells.map((c) => c.y)) })
+  const extent = span(field.cells)
+  const pads = field.cells.filter((c) => c.role === 'hero')
+  const reach = Math.max(0, ...pads.map((c) => ((c.size ?? 0) * (cellGlyph('dot').strokes.flat().reduce((m, q) => Math.max(m, Math.abs(q.x), Math.abs(q.y)), 0)))))
+  const chipBox = pads.length === 0 ? undefined : ((b: Box): Box => ({ x0: b.x0 - reach, x1: b.x1 + reach, y0: b.y0 - reach, y1: b.y1 + reach }))(span(pads))
+  acts.push(nameAct({ board, name: boardTitle(board, resolved).name, ending: resolved.ending, pitchPx, width: resolved.width, height: resolved.height, centre: field.cells.length === 0 ? { x: 0, y: 0 } : { x: (extent.x0 + extent.x1) / 2, y: (extent.y0 + extent.y1) / 2 }, chip: chipBox }))
 
   const glyphs = new Map<string, Glyph>()
-  for (const g of [...bench, ...words, ...acts.flatMap((a) => a.glyphs ?? [])]) glyphs.set(g.id, g)
+  for (const g of [...bench, ...acts.flatMap((a) => a.glyphs ?? [])]) glyphs.set(g.id, g)
   if (heroPkg !== undefined) glyphs.set(heroPkg.id, heroPkg)
   for (const k of CELL_KINDS) glyphs.set(cellId(k), cellGlyph(k))
-  if (resolved.title !== undefined) {
-    glyphs.set('txt:title', { id: 'txt:title', kind: 'text', strokes: [], text: resolved.title.name })
-  }
 
   const units: Unit[] = []
   for (const [ai, act] of acts.entries()) {
     const rng = makeRng(seed, `cells:${ai}`)
     const cells = [...act.cells]
-    if (ai === 2 && resolved.title !== undefined) {
-      const fy = Math.max(...cells.map((c) => c.y))
-      cells.push({ x: 0, y: fy + 1.6, role: 'text', sym: 'single', glyphId: 'txt:title', lag: 1.3 })
-    }
+    const far = act.id === 'field' ? Math.max(1e-9, ...cells.map((c) => c.at ?? 0)) : 0
     for (const cell of cells) {
       const gid = cell.glyphId ?? cellId(cell.kind ?? pickKind(cell.role, census, rng))
       const glyph = glyphs.get(gid)
@@ -265,9 +362,12 @@ export function composeFilm(
       const tone = cell.tone ?? ROLE_TONE[cell.role]
       units.push({
         act: ai,
+        in: 0,
+        out: 0,
         lag: cell.lag ?? 1,
         at: cell.at,
         life: cell.life,
+        land: cell.land,
         sites: atoms.map((a) => ({ x: a.x / PITCH, y: a.y / PITCH })),
         placement: {
           glyphId: gid,
@@ -278,8 +378,12 @@ export function composeFilm(
           outStep: 0,
           pattern: rng.int(0, 6),
           formation: ai,
-          ...(cell.weight === undefined ? {} : { weight: cell.weight }),
-          ...(cell.flare === undefined ? {} : { flare: cell.flare })
+          ...(PHONE_INK_ACTS.has(act.id) || cell.weight !== undefined ? { weight: (cell.weight ?? 1) * (PHONE_INK_ACTS.has(act.id) ? phoneInk : 1) } : {}),
+          ...(cell.flare === undefined ? {} : { flare: cell.flare }),
+          ...(far > 0 && cell.at !== undefined ? { reach: cell.at / far } : {}),
+          ...(cell.link === undefined ? {} : { link: cell.link }),
+          ...(cell.group === undefined ? {} : { group: cell.group }),
+          ...(cell.stage === undefined ? {} : { stage: cell.stage }),
         }
       })
     }
@@ -295,37 +399,126 @@ export function composeFilm(
     const rng = makeRng(seed, `grow:${ai}`)
     // an authored order travels at one speed, cell by cell; otherwise the
     // structure grows out from its seeds in pulses of two steps
+    const staged = mine.every((u) => u.land !== undefined)
+    for (const u of staged ? mine : []) u.in = g0 + Math.max(0, Math.round(((u.land ?? 0) * steps) / LOOP_BEATS) - DECODE_IN_STEPS)
     const timed = mine.every((u) => u.at !== undefined)
     const last = Math.max(1e-9, ...mine.map((u) => u.at ?? 0))
-    const grow = timed ? mine.map((u) => (u.at ?? 0) / last) : paced(growthDistances(mine, act.seeds))
+    const grow = staged ? [] : timed ? mine.map((u) => (u.at ?? 0) / last) : paced(growthDistances(mine, act.seeds))
+    const opening = [...grow].sort((a, b) => a - b)[Math.floor(FIRST_PULSE_SHARE * (grow.length - 1))] ?? 0
+    const fast = g1 - g0 < 2 * DECODE_IN_STEPS
     for (const [i, u] of mine.entries()) {
+      if (staged) break
       const frac = grow[i] as number
-      if (timed) {
-        u.placement.inStep = mod(g0 + Math.round((g1 - g0) * frac), steps)
+      if (fast) {
+        u.placement.pattern = FULL_FIRST_PATTERNS[i % FULL_FIRST_PATTERNS.length] as number
+        u.placement.steady = true
+      }
+      if (fast && frac <= opening) {
+        u.in = g0
         continue
       }
-      const jitter = frac > 0 && frac < 1 ? rng.int(0, 2) : 0
-      u.placement.inStep = mod(g0 + 2 * Math.round(((g1 - g0) * frac) / 2) + jitter, steps)
+      if (timed) {
+        u.in = g0 + Math.round((g1 - g0) * frac)
+        continue
+      }
+      const jitter = Math.round(((g1 - g0) * frac) / 2) > 0 && frac < 1 ? rng.int(0, 2) : 0
+      u.in = g0 + 2 * Math.round(((g1 - g0) * frac) / 2) + jitter
     }
     // strip toward the next act's seeds: the far side goes first, the cells
     // nearest the next seeds hold on as residue
-    const toward = act.stripTo ?? (acts[(ai + 1) % acts.length] as ActPlan).seeds
+    // before an act built out from its seeds, the marks nearest those seeds go first, just ahead of its front
+    const next = acts[(ai + 1) % acts.length] as ActPlan
+    const outward = next.cells.every((c) => c.land !== undefined)
+    const toward = outward ? next.seeds : act.stripTo ?? next.seeds
     const s0 = at(t.strip[0])
     const s1 = at(t.strip[1])
-    const strip = paced(mine.map((u) => -Math.min(...u.sites.flatMap((p) => toward.map((q) => Math.hypot(p.x - q.x, p.y - q.y))))))
+    const strip = paced(mine.map((u) => (outward ? 1 : -1) * Math.min(...u.sites.flatMap((p) => toward.map((q) => Math.hypot(p.x - q.x, p.y - q.y))))))
     for (const [i, u] of mine.entries()) {
-      u.placement.outStep = mod(s0 + Math.round((s1 - s0) * (strip[i] as number)) + rng.int(0, 2), steps)
+      u.out = s0 + Math.round((s1 - s0) * (strip[i] as number)) + (s1 > s0 ? rng.int(0, 2) : 0)
       // a brief mark leaves right after it lands
-      if (u.life !== undefined) u.placement.outStep = mod(u.placement.inStep + DECODE_IN_STEPS + u.life, steps)
+      if (u.life !== undefined) u.out = u.in + DECODE_IN_STEPS + u.life
     }
   }
 
-  // seed marks: the next act's first dots appear while the last act strips
+  // no formation is drawn over another: a mark has decoded out before the next act writes one in beside it, and the main chip before the next act writes its chip, wherever that stands.
+  // A mark the next act writes again, the same glyph in the same place at the same size (the main chip), hands over to it and never goes dark
+  const clear = GLYPH_CLEAR / PITCH
+  const cellKey = (x: number, y: number, a: number): string => `${a}:${Math.floor(x / clear)},${Math.floor(y / clear)}`
+  const index = new Map<string, number[]>()
+  units.forEach((v, i) => {
+    for (const q of v.sites) {
+      const key = cellKey(q.x, q.y, v.act)
+      const list = index.get(key) ?? []
+      if (list[list.length - 1] !== i) list.push(i)
+      index.set(key, list)
+    }
+  })
+  const beside = (u: Unit, act: number): Unit[] => {
+    const found = new Set<number>()
+    for (const p of u.sites) for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const i of index.get(cellKey(p.x + dx * clear, p.y + dy * clear, act)) ?? []) found.add(i)
+    return [...found].sort((a, b) => a - b).map((i) => units[i] as Unit).filter((v) => v.sites.some((q) => u.sites.some((p) => Math.hypot(p.x - q.x, p.y - q.y) <= clear)))
+  }
+  for (const u of units) {
+    const next = (u.act + 1) % acts.length
+    const lap = next > u.act ? 0 : steps
+    const near = u.placement.role === 'hero'
+      ? [...new Set([...beside(u, next), ...units.filter((v) => v.act === next && v.placement.role === 'hero')])]
+      : beside(u, next)
+    const again = u.placement.role === 'hero' ? near.find((v) => v.placement.glyphId === u.placement.glyphId && JSON.stringify(v.placement.atoms) === JSON.stringify(u.placement.atoms)) : undefined
+    u.out = again === undefined
+      ? Math.max(u.in + DECODE_IN_STEPS, Math.min(u.out, Math.min(...near.map((v) => v.in + lap)) - DECODE_OUT_STEPS))
+      : again.in + lap + DECODE_IN_STEPS
+    if (acts[next]?.cells.every((c) => c.land !== undefined) === true && next !== u.act) u.out = Math.max(u.in + DECODE_IN_STEPS, Math.min(...units.filter((v) => v.act === next).map((v) => v.in + lap)) - Math.round((GLYPH_CUT_EARLY * 15) / resolved.fps))
+    u.placement.inStep = mod(u.in, steps)
+    u.placement.outStep = mod(u.out, steps)
+  }
+
+  const NAME_ACT = acts.length - 1
+  if (resolved.ending === 'routes') {
+    for (const u of units.filter((v) => v.act === FIELD_ACT && v.placement.role === 'hero')) {
+      u.out = at((SCORE[NAME_ACT] as ActTiming).strip[0])
+      u.placement.outStep = mod(u.out, steps)
+    }
+  }
+
+  // the push into the act before the staged one ends on its main chip alone: the parts of the chip's size its last frame would show write out first
+  for (const [ai] of acts.entries()) {
+    const next = (ai + 1) % acts.length
+    if (!(acts[next]?.cells.every((c) => c.land !== undefined) ?? false)) continue
+    const span = (u: Unit): [number, number] => {
+      const pts = glyphs.get(u.placement.glyphId)?.strokes.flat() ?? []
+      const k = u.placement.atoms[0]?.scale ?? 0
+      const r = u.placement.atoms[0]?.rot ?? 0
+      const w = pts.length === 0 ? 0 : (Math.max(...pts.map((q) => q.x)) - Math.min(...pts.map((q) => q.x))) * k
+      const h = pts.length === 0 ? 0 : (Math.max(...pts.map((q) => q.y)) - Math.min(...pts.map((q) => q.y))) * k
+      return [Math.abs(Math.cos(r)) * w + Math.abs(Math.sin(r)) * h, Math.abs(Math.sin(r)) * w + Math.abs(Math.cos(r)) * h]
+    }
+    const chip = units.find((u) => u.act === ai && u.placement.role === 'hero')
+    const centre = chip?.placement.atoms[0]
+    if (chip === undefined || centre === undefined) continue
+    const [cw, ch] = span(chip)
+    const hw = cw / (2 * GLYPH_CHIP_SHARE)
+    const hh = (hw * resolved.height) / resolved.width
+    const cut = Math.min(...units.filter((v) => v.act === next).map((v) => v.in + (next > ai ? 0 : steps))) - Math.round((GLYPH_CUT_EARLY * 15) / resolved.fps)
+    for (const u of units.filter((v) => v.act === ai && v !== chip)) {
+      const [w, h] = span(u)
+      if (Math.max(w, h) < CHIP_LIKE * Math.max(cw, ch)) continue
+      if (!u.placement.atoms.some((a) => Math.abs(a.x - centre.x) < hw + w / 2 && Math.abs(a.y - centre.y) < hh + h / 2)) continue
+      u.out = Math.max(u.in + DECODE_IN_STEPS, Math.min(u.out, cut - CHIP_CLEAR_STEPS))
+      u.placement.outStep = mod(u.out, steps)
+    }
+  }
+
+  // the staged act's first point appears on the cut into it, where the camera has just closed on the chip
   for (const [ai, act] of acts.entries()) {
+    if (!act.cells.every((c) => c.land !== undefined)) continue
     const t = SCORE[ai] as ActTiming
     const atoms = act.seeds.map((p) => ({ x: p.x * PITCH, y: p.y * PITCH, rot: 0, scale: 0.8 * PITCH }))
+    const point = at(t.grow[0]) - Math.round((GLYPH_CUT_EARLY * 15) / resolved.fps)
     units.push({
       act: ai,
+      in: point,
+      out: at(t.grow[0]) + 3,
       lag: 1,
       sites: act.seeds,
       placement: {
@@ -333,7 +526,7 @@ export function composeFilm(
         atoms,
         tones: atoms.map(() => 0.9),
         role: 'punct',
-        inStep: mod(at(t.seeds), steps),
+        inStep: mod(point, steps),
         outStep: mod(at(t.grow[0]) + 3, steps),
         pattern: 1,
         formation: ai
@@ -347,7 +540,7 @@ export function composeFilm(
     const rng = makeRng(seed, `breath:${ai}`)
     const pool = units.filter((u) => u.act === ai && u.life === undefined && u.placement.role !== 'hero' && u.placement.role !== 'text' && u.sites.length > 1)
     if (pool.length === 0) continue
-    const h0 = at(t.grow[1]) + 6
+    const h0 = at(t.breath ?? t.grow[1]) + 6
     const h1 = at(t.strip[0]) - 2
     for (let s = h0; s < h1; s += 2 + rng.int(0, 3)) {
       const u = rng.pick(pool)
@@ -375,11 +568,47 @@ export function composeFilm(
     })
     .sort((a, b) => a.startPhase - b.startPhase)
 
+  const frameOf = (step: number): number => Math.round((step * resolved.fps) / 15)
+  const writes = acts.map((act, i) => ({ id: act.id, at: frameOf(mod(at((SCORE[i] as ActTiming).grow[0]) - shift, steps)) }))
+  const lettered = [...new Set(units.filter((u) => u.act === NAME_ACT).map((u) => u.placement.group as string))]
+  const letters = lettered.map((g) => ({ at: frameOf(Math.min(...units.filter((u) => u.act === NAME_ACT && u.placement.group === g).map((u) => mod(u.in - shift, steps)))), kind: 'letter' as const })).filter((e, i, all) => all.findIndex((o) => o.at === e.at) === i)
+  const named = [{ at: frameOf(mod(Math.max(...units.filter((u) => u.act === NAME_ACT).map((u) => u.in)) + DECODE_IN_STEPS - shift, steps)), kind: 'name' as const }]
+  const sounded = [...writes.map((w) => w.at), ...named.map((e) => e.at)]
+  // a staged act locks when its last marks land; the others when their growth ends
+  const landing = (i: number): number | undefined => {
+    const mine = units.filter((u) => u.act === i && u.land !== undefined && u.placement.role !== 'text')
+    return mine.length === 0 ? undefined : Math.max(...mine.map((u) => u.in)) + DECODE_IN_STEPS
+  }
+  const locks = acts.map((_, i) => {
+    const landed = landing(i)
+    return landed === undefined
+      ? frameOf(mod(at((SCORE[i] as ActTiming).grow[1]) - shift, steps) + DECODE_IN_STEPS)
+      : frameOf(mod(landed - shift, steps))
+  })
+  const total = frameOf(steps)
+  const snaps = (a: number, b: number): boolean => glide(a / total) / glide((b - LAND_EARLY) / total) - 1 > PULL_SMALL
+  const pulls = writes.filter((w) => w.id !== 'name').map((w, i): [number, number] => [w.at, Math.min(locks[i] as number, film - PULL_CLEAR)]).filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]).map(([a, b], i, all): [number, number] => [Math.max(snaps(a, b) ? Math.min(a, b - PULL_LEAST) : a, all[i - 1]?.[1] ?? 0), b])
+  const events = ([
+    { at: 0, kind: 'open' },
+    ...writes.map((w) => ({ at: w.at, kind: 'form' as const })),
+    ...locks.map((f) => ({ at: f, kind: 'lock' as const }))
+      
+      .filter((e) => e.at < film && sounded.every((f) => Math.abs(f - e.at) > LOCK_CLEAR * resolved.fps)),
+    ...named,
+    ...letters,
+    { at: writes.find((w) => w.id === 'field')?.at ?? 0, kind: 'turn' },
+    ...[...new Set(placements.flatMap((p) => (p.stage === undefined ? [] : [p.stage])))].sort((a, b) => a - b)
+      .map((stage) => ({ at: frameOf(Math.min(...placements.filter((p) => p.stage === stage).map((p) => p.inStep))), kind: 'stage' as const, stage })),
+    ...(placements.some((p) => p.stage !== undefined) ? [{ at: (locks[FIELD_ACT] as number) + Math.round(frameOf(steps) / LOOP_BEATS), kind: 'button' as const }] : [])
+  ] satisfies GlyphEvent[]).filter((e) => e.at < film).sort((a, b) => a.at - b.at)
+
   const used = new Set(placements.map((p) => p.glyphId))
   return {
     cast: [...glyphs.values()].filter((g) => used.has(g.id)),
     placements,
     formations,
+    events,
+    pulls,
     steps,
     cadence: resolved.cadence,
     warnings

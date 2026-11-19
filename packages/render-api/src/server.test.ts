@@ -275,7 +275,7 @@ describe('render-api contract', () => {
     })
   })
 
-  it('downloads completed renders when the advisory is unavailable', async () => {
+  it('downloads completed renders', async () => {
     await mkdir(testExports, { recursive: true })
     const downloadPath = path.join(testExports, 'done-job.mp4')
     await writeFile(downloadPath, 'tiny video')

@@ -20,17 +20,13 @@
   --ink-rgb: var(--stock-rgb);
   --bg-rgb: var(--opal-rgb);
   --c-muted: #4a4a46;
-  --c-dim: #4f4f4b;
   --c-red: #c4221a;
   --c-line: rgb(var(--ink-rgb) / 0.14);
   --c-line-2: rgb(var(--ink-rgb) / 0.3);
   --c-veil: rgb(var(--bg-rgb) / 0.86);
   --c-head: var(--pencil);
-  --c-fg: var(--c-ink);
-  --c-led: var(--c-red);
 
   /* type roles: headings are drawn in KiCad's stroke lettering (Lettering.astro); Martian Mono sets everything else, like a datasheet */
-  --f-display: 'Martian Mono', ui-monospace, Menlo, monospace;
   --f-body: 'Martian Mono', ui-monospace, Menlo, monospace;
   --f-mono: 'Martian Mono', ui-monospace, Menlo, monospace;
 
@@ -43,24 +39,20 @@
   --t-xs: 0.8125rem;
   --t-label: 0.8125rem;
 
-  --u: clamp(0.5rem, 0.35rem + 0.6vw, 1rem);
   --gutter: clamp(1.25rem, 0.6rem + 1.9vw, 2.25rem);
   --maxw: 1600px;
-  --radius: 0px;
 
   /* one easing family: the strip seats in the gate (quick in, long settle) */
-  /* motion tokens: press 120 ms, state 200 ms, panel 320 ms, section 600 ms; enter with --soft, leave faster with --out */
+  /* motion tokens: press 120 ms, state 200 ms, panel 320 ms, section 600 ms; enter with --soft */
   --t1: 120ms;
   --t2: 200ms;
   --t3: 320ms;
   --t4: 600ms;
-  --out: cubic-bezier(0.4, 0, 1, 1);
   --seat: cubic-bezier(0.2, 0.9, 0.1, 1);
   --soft: cubic-bezier(0.25, 1, 0.5, 1);
   /* the claw: a fast pull, a hard stop on the next frame */
   --pull: cubic-bezier(0.77, 0, 0.175, 1);
 
-  --z-world: 0;
   --z-content: 1;
   --z-hud: 40;
   --z-header: 50;
@@ -74,7 +66,6 @@
   --ink-rgb: var(--opal-rgb);
   --bg-rgb: var(--stock-rgb);
   --c-muted: #a9a9a3;
-  --c-dim: #9a9a94;
   --c-red: #ff4a3d;
   --c-line: rgb(var(--ink-rgb) / 0.14);
   --c-line-2: rgb(var(--ink-rgb) / 0.3);

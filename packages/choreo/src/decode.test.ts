@@ -160,3 +160,14 @@ describe('flareTone', () => {
     expect(flareTone(inStep, inStep, undefined, 0.6, STEPS)).toBe(0.6)
   })
 })
+
+describe('the steady write-in', () => {
+  it('never falls back once it has reached a level, then holds and writes out as the decode does', async () => {
+    const { steadyAlpha } = await import('./decode')
+    for (let pattern = 0; pattern < 6; pattern++) {
+      const run = Array.from({ length: 30 }, (_, s) => steadyAlpha(s, 0, 20, pattern, 168))
+      for (let s = 1; s < 20; s++) expect(run[s] as number).toBeGreaterThanOrEqual(run[s - 1] as number)
+      expect(run[10]).toBe(1)
+    }
+  })
+})

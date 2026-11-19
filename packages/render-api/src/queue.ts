@@ -282,6 +282,7 @@ function mergeConfig(partial: Partial<FilmConfig> | undefined, demoId?: string):
   if (partial.palette !== undefined) config.palette = partial.palette
   if (partial.accent !== undefined) config.accent = partial.accent
   if (partial.title !== undefined) config.title = partial.title
+  if (partial.credit !== undefined) config.credit = partial.credit
   if (partial.transparent !== undefined) config.transparent = partial.transparent
   if (partial.cast !== undefined) config.cast = partial.cast
   if (partial.hero !== undefined) config.hero = partial.hero

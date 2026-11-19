@@ -330,6 +330,65 @@ describe('VAL-INGEST-017 pad fidelity', () => {
     expect(trapezoidPad?.shape).toBe('trapezoid')
     expect(model.stats.pads).toBe(2)
   })
+
+  const probe = (layers: string): ReturnType<typeof parseKicadPcb> => parseKicadPcb(`(kicad_pcb (version 20241229) (generator pcbnew)
+      (layers (0 "F.Cu" signal) (31 "B.Cu" signal))
+      (footprint "PasteProbe" (layer "F.Cu")
+        (at 10 20)
+        (property "Reference" "PP1" (at 0 0) (layer "F.SilkS"))
+        (pad "1" smd roundrect (at 0 0) (size 1 1) ${layers})
+      )
+    )`, 'paste-probe.kicad_pcb')
+
+  it('puts a pad that names only layers without copper on no copper layer and leaves it out of its footprint', () => {
+    const model = probe('(layers "F.Paste")')
+    expect(Object.values(model.copper).flatMap((layer) => layer.pads)).toEqual([])
+    expect(model.footprints.find((fp) => fp.ref === 'PP1')?.padRefs).toEqual([])
+  })
+
+  it('still puts a pad that names no layers on the front copper', () => {
+    const model = probe('')
+    expect(model.copper['F.Cu']?.pads.map((pad) => pad.footprintRef)).toEqual(['PP1'])
+  })
+
+  it('gives iCEBreaker\'s main chip, U6, its 48 pins, its exposed pad and the 9 thermal vias through it, without the 16 paste openings over that pad', () => {
+    const model = parseKicadPcb(loadBoard('icebreaker.kicad_pcb'), 'icebreaker.kicad_pcb')
+    const u6 = model.footprints.find((fp) => fp.ref === 'U6')
+    expect(u6?.padRefs.length).toBe(58)
+    const own = new Set(u6?.padRefs)
+    const exposed = model.copper['F.Cu']?.pads.filter((pad) => own.has(pad.id) && pad.num === '49') ?? []
+    expect(exposed.map((pad) => pad.size.x).sort((x, y) => y - x)).toEqual([5.6, ...Array.from({ length: 9 }, () => 0.5)])
+  })
+})
+
+describe('pads that name no copper layer', () => {
+  it('leaves iCEBreaker\'s paste openings off the board: U6 carries its 48 pins, the exposed pad and its nine thermal vias (thru-hole pads numbered 49), not the sixteen paste openings', () => {
+    const model = parseKicadPcb(loadBoard('icebreaker.kicad_pcb'), 'icebreaker.kicad_pcb')
+    const u6 = model.footprints.find((fp) => fp.ref === 'U6')
+    expect(u6?.padRefs.length).toBe(58)
+    const onCopper = Object.values(model.copper).flatMap((layer) => layer.pads).filter((pad) => pad.footprintRef === 'U6')
+    expect(onCopper.filter((pad) => pad.shape !== 'circle').length).toBe(49)
+    expect(onCopper.filter((pad) => pad.num === '49' && pad.shape !== 'circle').map((pad) => pad.size)).toEqual([{ x: 5.6, y: 5.6 }])
+  })
+
+  it('puts a paste-only pad on no copper layer, keeps its drill, and still falls back for a pad with no layers list', () => {
+    const doc = `(kicad_pcb (version 20241229) (generator pcbnew)
+      (layers (0 "F.Cu" signal) (31 "B.Cu" signal))
+      (footprint "PasteProbe" (layer "F.Cu")
+        (at 10 20)
+        (property "Reference" "PP1" (at 0 0) (layer "F.SilkS"))
+        (pad "" smd rect (at 0 0) (size 1 1) (layers "F.Paste"))
+        (pad "" np_thru_hole circle (at 2 0) (size 1 1) (drill 1) (layers "F.Mask"))
+        (pad "1" smd rect (at 4 0) (size 1 1))
+        (pad "2" thru_hole circle (at 6 0) (size 2 2) (drill 1))
+      )
+    )`
+    const model = parseKicadPcb(doc, 'paste-probe.kicad_pcb')
+    const pads = Object.entries(model.copper).flatMap(([layer, c]) => c.pads.map((pad) => `${layer}:${pad.pos.x}`))
+    expect(pads.sort()).toEqual(['B.Cu:16', 'F.Cu:14', 'F.Cu:16'])
+    expect(model.footprints[0]?.padRefs.length).toBe(2)
+    expect(model.drill.map((d) => [d.pos.x, d.plated]).sort()).toEqual([[12, false], [16, true]])
+  })
 })
 
 describe('Edge.Cuts beyond lines and arcs', () => {

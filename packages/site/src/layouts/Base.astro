@@ -6,19 +6,38 @@ import '../styles/base.css'
 
 interface Props { title?: string; description?: string; image?: string; noindex?: boolean }
 const { title, description = site.description, image = '/og.png', noindex = false } = Astro.props
-const fullTitle = title ? `${title} | ${site.name}` : `${site.name}: ${site.line}`
+const fullTitle = title ? `${title} | ${site.name}` : site.title
 const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href
 const ogImage = new URL(image, Astro.site ?? site.url).href
 const ogVideo = new URL('/og.mp4', Astro.site ?? site.url).href
 const jsonLd = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: site.name,
-  applicationCategory: 'MultimediaApplication',
-  operatingSystem: 'macOS, Linux, Windows (Node.js)',
-  description: site.description,
-  url: site.url,
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      '@id': `${site.url}/#software`,
+      name: site.name,
+      applicationCategory: 'MultimediaApplication',
+      operatingSystem: 'macOS, Linux, Windows (Node.js 22 or later, ffmpeg)',
+      description: site.description,
+      url: site.url,
+      license: 'https://www.apache.org/licenses/LICENSE-2.0',
+      isAccessibleForFree: true,
+      codeRepository: site.repo,
+      sameAs: [site.repo, site.caseStudy],
+      author: site.author,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${site.url}/#website`,
+      name: site.name,
+      url: site.url,
+      description: site.description,
+      publisher: site.author,
+      author: site.author
+    }
+  ]
 }
 ---
 <!doctype html>
@@ -30,6 +49,7 @@ const jsonLd = {
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+    <meta name="author" content="Hridya Agrawal" />
     <meta name="theme-color" content="#ecede9" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
@@ -57,9 +77,8 @@ const jsonLd = {
     <script is:inline>
       (function () {
         var h = document.documentElement
-        h.classList.add('js')
-        if (window.WebGL2RenderingContext) h.classList.add('gl')
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) h.classList.add('motion')
+        setTimeout(function () { if (!('plot' in h.dataset)) h.classList.add('plot-off') }, 900)
         // a page transition the browser abandons (a fast second click, a back swipe) is not an error
         var hush = function (e) { var v = e.viewTransition; if (v) [v.ready, v.finished, v.updateCallbackDone].forEach(function (p) { p.catch(function () {}) }) }
         addEventListener('pageswap', hush)
@@ -70,7 +89,7 @@ const jsonLd = {
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <slot name="world" />
-    <Header />
+    <slot name="header"><Header /></slot>
     <main id="main" tabindex="-1">
       <slot />
     </main>

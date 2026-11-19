@@ -29,7 +29,7 @@ export interface PartMm {
   pinZ?: number | undefined
 }
 
-const SKIP = /^(H|MH|TP|FID|G|LOGO|REF|#|NT|JP\d|MK|KEY|SH)/i
+const SKIP = /^(H|MH|TP|FID|G|LOGO|REF|NT|JP|MK|KEY)\d*$|^#/i
 
 function kindOf(ref: string, value: string | undefined, nPads: number, tht: boolean, spanMm: number): PartKind {
   const r = ref.toUpperCase()
@@ -92,6 +92,8 @@ export function extractParts(board: BoardModel): PartMm[] {
     // KiCad's own 3D model names a vertical header or socket: a plastic housing, pins standing out of a header
     const header = /^Pin(Header|Socket)_(\d+)x\d+_P([\d.]+)mm_(Vertical|Horizontal)/.exec(fp.model ?? '')
     const kind = header !== null ? 'conn' : tht && onCircle(pads.map((p) => p.pad.pos)) ? 'valve' : kindOf(fp.ref, fp.value, pads.length, tht, body.span)
+    if (kind === 'conn' && header === null && pads.length === 1 && fp.models.length === 0) continue
+    if (fp.models.length === 0 && pads.length >= 10 && !tht && pads.every((p) => Math.max(p.pad.size.x, p.pad.size.y) >= 3 * Math.min(p.pad.size.x, p.pad.size.y))) continue
     // two-pad passives sit between their pads, not over them
     let { w, h } = body
     if ((kind === 'res' || kind === 'cap' || kind === 'ind' || kind === 'diode' || kind === 'led') && pads.length === 2 && !tht) {
@@ -201,7 +203,7 @@ interface Body { centre: Vec2; w: number; h: number; span: number }
  * perimeter-pin packages (the pins sit outside a QFP's body).
  */
 function bodyOf(fp: Footprint, pads: Pad[], silk: Vec2[]): Body | undefined {
-  const a = (-fp.rot * Math.PI) / 180
+  const a = (fp.rot * Math.PI) / 180
   const c = Math.cos(a)
   const s = Math.sin(a)
   const local = (p: Vec2): Vec2 => {

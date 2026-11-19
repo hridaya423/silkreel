@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { GLYPH_FILM_BEATS, GLYPH_LOOP_BEATS } from './config'
 import { compileTimeline } from './index'
 import { decodeAlpha } from './decode'
 import { boardModel } from '../test/helpers'
@@ -11,7 +12,7 @@ describe('choreo package smoke', () => {
     'icebreaker.kicad_pcb',
     'glasgow.kicad_pcb'
   ]) {
-    it(`compiles ${name} to a looping glyph timeline`, () => {
+    it(`compiles ${name} to a glyph timeline`, () => {
       const tl = compileTimeline(boardModel(name), {
         style: 'glyph',
         knobs: {},
@@ -20,22 +21,20 @@ describe('choreo package smoke', () => {
         output: { width: 1080, height: 1350, fps: 15 }
       })
       if (tl.style !== 'glyph') throw new Error('expected a glyph timeline')
-      // 11.2s auto duration → 168 decode steps; 168 output frames at fps 15
-      expect(tl.totalFrames).toBe(168)
-      expect(tl.steps).toBe(168)
+      expect(tl.totalFrames).toBe(7 * GLYPH_FILM_BEATS)
+      expect(tl.steps).toBe(7 * GLYPH_LOOP_BEATS)
       expect(tl.cast.length).toBeGreaterThan(0)
       // every cast member is placed at least once — dead cast was trimmed
       for (const g of tl.cast) {
         expect(tl.placements.some((p) => p.glyphId === g.id), `${g.id} never placed`).toBe(true)
       }
       const ids = tl.formations.map((f) => f.id)
-      // the fixed three-act score: route, plan, frame — sorted by startPhase
-      expect([...ids].sort()).toEqual(['frame', 'plan', 'route'])
+      expect([...ids].sort()).toEqual(['cluster', 'diagonal', 'field', 'name', 'plan', 'route'])
       for (const f of tl.formations) {
         expect(f.endPhase).toBeGreaterThan(f.startPhase)
       }
-      // the frame act is the climax — its window is lit, and the hero stands in it
-      const frame = tl.formations.find((f) => f.id === 'frame')
+      // the field is the last scene — its window is lit, and the main chip stands in it
+      const frame = tl.formations.find((f) => f.id === 'field')
       expect(frame).toBeDefined()
       if (frame === undefined) return
       const start = Math.round(frame.startPhase * tl.steps)
@@ -47,10 +46,10 @@ describe('choreo package smoke', () => {
         return false
       })
       expect(lit.length).toBeGreaterThan(0)
-      // the climax crowns one hero — an accent, not a flood
-      const heroes = tl.placements.filter((p) => p.role === 'hero')
+      // the last scene crowns one chip: its own pads, all one mark
+      const heroes = tl.placements.filter((p) => p.role === 'hero' && p.formation === frame.beat)
       expect(heroes.length).toBeGreaterThan(0)
-      expect(heroes.length).toBeLessThanOrEqual(4)
+      expect(new Set(heroes.map((p) => p.glyphId)).size).toBe(1)
       const heroLit = heroes.some((p) => {
         for (let s = start; s < end; s++) {
           if (decodeAlpha(s % tl.steps, p.inStep, p.outStep, p.pattern, tl.steps) > 0.05) return true

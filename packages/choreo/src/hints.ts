@@ -12,6 +12,7 @@ export const DEMO_CAST_HINTS: Readonly<Record<string, CastHints>> = {
   },
   glasgow: {
     preferRefs: ['J4', 'J2', 'J3', 'J1', 'J5', 'J10', 'U1', 'SW1'],
-    preferTexts: ['ADC A', 'ADC B', 'AUX', 'ACT', '5V', '3V3', '1V2', 'LVDS']
+    preferTexts: ['ADC A', 'ADC B', 'AUX', 'ACT', '5V', '3V3', '1V2', 'LVDS'],
+    hero: 'U30'
   }
 }

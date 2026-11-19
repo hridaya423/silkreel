@@ -1,5 +1,5 @@
 // trace look-loop: stills of the lit trace renderer at chosen phases, one sheet per board
-// usage: [STYLE=plot] npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
+// usage: [STYLE=plot] [TITLE=1|name] npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
 // part models: SILK_REEL_MODELS=dir1:dir2 adds STEP folders (; on Windows); SILK_REEL_MODELS=none keeps estimated bodies
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
@@ -10,7 +10,7 @@ import type { OpenGlRenderer } from '@remotion/renderer'
 import { ASPECT_SIZE, compileTimeline } from '../packages/choreo/src/index.ts'
 import type { Aspect, FilmConfig } from '../packages/choreo/src/index.ts'
 import { parseKicadPcb } from '../packages/ingest/src/index.ts'
-import { loadDemoBoard, defaultFilmConfig } from '../packages/render-api/src/boards.ts'
+import { DEMO_TITLES, loadDemoBoard, defaultFilmConfig } from '../packages/render-api/src/boards.ts'
 import { loadPartBodies } from '../packages/render-api/src/models.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -18,16 +18,16 @@ const [boardsArg = 'glasgow', aspect = '4:5', atArg = '0.05,0.3,0.62,0.9', outAr
 const out = path.resolve(root, outArg)
 mkdirSync(out, { recursive: true })
 const chromiumOptions = { gl: (process.env.SILK_REEL_GL ?? 'angle') as OpenGlRenderer }
-const serveUrl = await bundle({ entryPoint: path.join(root, 'packages/render/src/remotion-entry.tsx'), onProgress: () => undefined })
+const serveUrl = await bundle({ entryPoint: path.join(root, 'packages/render/src/remotion-entry.tsx'), onProgress: () => undefined, enableCaching: false })
 try {
   for (const arg of boardsArg.split(',')) {
     const own = arg.endsWith('.kicad_pcb')
     const board = own ? path.basename(arg, '.kicad_pcb') : arg
     const size = ASPECT_SIZE[aspect as Aspect]
-    const config = { ...defaultFilmConfig(board), style: process.env.STYLE ?? 'trace', aspect, ...(process.env.TITLE === undefined ? {} : { title: { name: process.env.TITLE } }), output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
+    const config = { ...defaultFilmConfig(board), style: process.env.STYLE ?? 'trace', aspect, ...(process.env.TITLE === undefined ? {} : { title: { name: process.env.TITLE === '1' ? DEMO_TITLES[board] ?? board : process.env.TITLE } }), output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
     const model = own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board)
     const dirs = process.env.SILK_REEL_MODELS?.split(path.delimiter) ?? []
-    const bodies = dirs[0] === 'none' ? undefined : (await loadPartBodies(model, { boardDir: own ? path.dirname(path.resolve(arg)) : path.join(root, 'fixtures/boards'), dirs })).bodies
+    const bodies = dirs[0] === 'none' || (config.style !== 'trace' && config.style !== 'glyph') ? undefined : (await loadPartBodies(model, { boardDir: own ? path.dirname(path.resolve(arg)) : path.join(root, 'fixtures/boards'), dirs })).bodies
     const timeline = compileTimeline(model, config, bodies)
     const inputProps = { timeline }
     const composition = await selectComposition({ serveUrl, id: 'film', inputProps })

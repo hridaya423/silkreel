@@ -31,6 +31,14 @@ describe('pickHero', () => {
     const hero = pickHero(board, { preferRefs: ['U4', 'U5'] })
     expect(hero?.ref).toBe('U4')
   })
+  it.each([
+    ['kit-dev-coldfire-xilinx_5213.kicad_pcb', 'U102'],
+    ['icebreaker.kicad_pcb', 'U6'],
+    ['glasgow.kicad_pcb', 'U30'],
+    ['StickHub.kicad_pcb', 'U1']
+  ])('with no hint, %s is about the chip that carries the most signals: %s', (file, ref) => {
+    expect(pickHero(boardModel(file))?.ref).toBe(ref)
+  })
   it('returns undefined when the board has no footprints', () => {
     expect(pickHero(emptyBoard())).toBeUndefined()
   })

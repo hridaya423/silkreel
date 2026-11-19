@@ -8,7 +8,7 @@ export function parseKicadPcb(contents: string, fileName = 'board.kicad_pcb'): B
   if (looksLikeBinary(contents)) {
     throw new ParseError(fileName, 'it is a binary file, not a KiCad board file')
   }
-  const root = parseSExpr(contents, fileName)
+  const root = parseSExpr(contents.charCodeAt(0) === 0xfeff ? contents.slice(1) : contents, fileName)
   if (head(root) !== 'kicad_pcb') {
     throw new ParseError(fileName, `it is a KiCad file, but not a board: it starts with (${head(root)} ...), not (kicad_pcb ...)`)
   }

@@ -103,6 +103,24 @@ describe('render queue execution', () => {
     expect(doneJob(queue, gif.id).format).toBe('gif')
   })
 
+  it('carries the credit line into the compiled film', async () => {
+    const seen: RenderFilmOptions[] = []
+    const render = async (options: RenderFilmOptions): Promise<RenderFilmResult> => {
+      seen.push(options)
+      outputPaths.add(options.outputLocation)
+      await writeFile(options.outputLocation, 'test video')
+      return { bundleLocation: 'test-bundle', outputLocation: options.outputLocation }
+    }
+    const queue = new RenderQueue({
+      renderFilm: render,
+      bundle: () => Promise.resolve('test-bundle')
+    })
+    queue.submit({ demoId: 'ecc83-pp', config: { credit: true } })
+    queue.submit({ demoId: 'ecc83-pp' })
+    await queue.waitForIdle()
+    expect(seen.map((options) => options.inputProps.timeline.credit)).toEqual([true, false])
+  })
+
   it('serializes rendering across queue instances', async () => {
     const events: string[] = []
     let active = 0

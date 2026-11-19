@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { mkdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { parseKicadPcb } from '@silk-reel/ingest'
 import { compileTimeline } from '@silk-reel/choreo'
@@ -17,7 +17,7 @@ async function readBoard(input: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const { input, out, config, format, draft, audio, models, help } = parseCliArgs(process.argv.slice(2))
+  const { input, out, config, format, draft, audio, music, models, help } = parseCliArgs(process.argv.slice(2))
   if (help) {
     console.log(HELP)
     return
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     throw new Error(`Cannot write to ${path.dirname(outputLocation)}. Choose another -o path.`)
   })
   const board = parseKicadPcb(text, path.basename(input))
-  const loaded = models === undefined || config.style !== 'trace' ? undefined : await loadPartBodies(board, { boardDir: path.dirname(path.resolve(input)), dirs: models })
+  const loaded = models === undefined || (config.style !== 'trace' && config.style !== 'montage') ? undefined : await loadPartBodies(board, { boardDir: path.dirname(path.resolve(input)), dirs: models })
   if (loaded !== undefined) {
     const n = Object.keys(loaded.bodies.byRef).length
     console.log(`${n} of ${board.footprints.length} parts wear their own 3D model`)
@@ -41,11 +41,12 @@ async function main(): Promise<void> {
   const live = process.stdout.isTTY
   const started = Date.now()
   let shown = -1
-  const { posterLocation } = await renderFilm({
+  const { posterLocation, bundleLocation } = await renderFilm({
     inputProps: { timeline, quality: draft ? 'draft' : 'final' },
     outputLocation,
     format,
     audio,
+    music,
     poster: true,
     onBrowserDownload: (mb) => {
       console.log(`Downloading a headless Chrome (${mb} MB, first run only)…`)
@@ -59,6 +60,7 @@ async function main(): Promise<void> {
       }
     }
   })
+  await rm(bundleLocation, { recursive: true, force: true })
   if (live) process.stdout.write('\n')
   const { size } = await stat(outputLocation)
   console.log(`${outputLocation} (${(size / 1e6).toFixed(1)} MB, ${Math.round((Date.now() - started) / 1000)} s)`)

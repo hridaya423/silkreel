@@ -5,7 +5,7 @@ const [url, out] = process.argv.slice(2)
 const args = process.argv.slice(2)
 const opt = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : args[i + 1] }
 mkdirSync(out, { recursive: true })
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
+const browser = await chromium.launch({ channel: 'chrome', chromiumSandbox: true, headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const page = await browser.newPage({ viewport: { width: +opt('--width', 1440), height: +opt('--height', 900) }, deviceScaleFactor: +opt('--dpr', 1) })
 if (args.includes('--reduced')) await page.emulateMedia({ reducedMotion: 'reduce' })
 const logs = []

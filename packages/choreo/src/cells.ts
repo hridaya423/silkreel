@@ -97,15 +97,33 @@ export function cellGlyph(kind: CellKind): Glyph {
 
 export const CELL_KINDS = Object.keys(SHAPES) as CellKind[]
 
+/** half the hero body's long side, in units of its size */
+export const HERO_HALF = 0.36
+
 /**
- * The hero, drawn from its own pads: a chamfered body ringed by pin ticks for
- * leaded/QFN parts, or a ball grid for BGAs — the one shape on the loop a
- * designer would point at and say "that's the FPGA".
+ * The hero, drawn from its own pads in its own frame (the footprint's turn,
+ * in degrees as KiCad writes it, taken off): a chamfered body ringed by pin
+ * ticks for leaded/QFN parts, or a ball grid for BGAs — the one shape on the
+ * loop a designer would point at and say "that's the FPGA".
  */
-export function heroChip(board: BoardModel, ref: string): Glyph | undefined {
-  const pads: Vec2[] = []
+export function isBallGrid(pads: Array<Vec2 & { num?: string | undefined }>): boolean {
+  const xs = pads.map((p) => p.x)
+  const ys = pads.map((p) => p.y)
+  const w = Math.max(1e-6, Math.max(...xs) - Math.min(...xs))
+  const h = Math.max(1e-6, Math.max(...ys) - Math.min(...ys))
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2
+  const cy = (Math.max(...ys) + Math.min(...ys)) / 2
+  const id = (p: { num?: string | undefined }, i: number): string => (p.num === undefined || p.num === '' ? `#${i}` : p.num)
+  const inner = new Set(pads.flatMap((p, i) => (Math.abs(p.x - cx) < w * 0.3 && Math.abs(p.y - cy) < h * 0.3 ? [id(p, i)] : [])))
+  return inner.size / new Set(pads.map(id)).size > 0.15
+}
+
+export function heroChip(board: BoardModel, ref: string, rotDeg = 0): Glyph | undefined {
+  const pads: Array<Vec2 & { num?: string | undefined; r: number }> = []
+  const cos = Math.cos((rotDeg * PI) / 180)
+  const sin = Math.sin((rotDeg * PI) / 180)
   for (const layer of Object.values(board.copper)) {
-    for (const p of layer.pads) if (p.footprintRef === ref) pads.push(p.pos)
+    for (const p of layer.pads) if (p.footprintRef === ref) pads.push({ x: p.pos.x * cos - p.pos.y * sin, y: p.pos.x * sin + p.pos.y * cos, num: p.num, r: Math.max(p.size.x, p.size.y) / 2 })
   }
   if (pads.length < 4) return undefined
   const xs = pads.map((p) => p.x)
@@ -118,10 +136,10 @@ export function heroChip(board: BoardModel, ref: string): Glyph | undefined {
   const h = Math.max(1e-6, maxY - minY)
   // balls fill the interior; leads hug the perimeter
   const inner = pads.filter((p) => Math.abs(p.x - (minX + maxX) / 2) < w * 0.3 && Math.abs(p.y - (minY + maxY) / 2) < h * 0.3)
-  const bga = inner.length / pads.length > 0.15
+  const bga = isBallGrid(pads)
   const ar = Math.min(1.6, Math.max(1 / 1.6, w / h))
-  const bw = 0.36 * (ar >= 1 ? 1 : ar)
-  const bh = 0.36 * (ar >= 1 ? 1 / ar : 1)
+  const bw = HERO_HALF * (ar >= 1 ? 1 : ar)
+  const bh = HERO_HALF * (ar >= 1 ? 1 / ar : 1)
   const c = 0.09
   const strokes: Vec2[][] = [[
     { x: -bw + c, y: -bh },
@@ -152,6 +170,14 @@ export function heroChip(board: BoardModel, ref: string): Glyph | undefined {
       strokes.push([{ x: bw + 0.03, y: ty }, { x: bw + 0.03 + len, y: ty }])
     }
     strokes.push(arc(-bw + 0.12, -bh + 0.12, 0.025, 0, PI * 2, 8))
+    if (inner.length > 0) {
+      const u = (2 * bw) / w
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const ew = Math.min(bw - 0.18, u * Math.max(...inner.map((p) => Math.abs(p.x - cx) + p.r)))
+      const eh = Math.min(bh - 0.18, u * Math.max(...inner.map((p) => Math.abs(p.y - cy) + p.r)))
+      if (ew > 0.03 && eh > 0.03) strokes.push(box(ew, eh))
+    }
   }
   return { id: `hero:${ref}`, kind: 'package', strokes }
 }
@@ -161,7 +187,7 @@ type FpClass = 'ic' | 'diode' | 'passive' | 'conn' | 'hole' | 'tp' | 'xtal' | 't
 
 export function classify(ref: string, value: string | undefined): FpClass {
   const v = value ?? ''
-  if (/^(FID|H|MH|MK)\d*/i.test(ref) || /mount|fiducial/i.test(v)) return 'hole'
+  if (/^(FID|H|MH|MK)\d*$/i.test(ref) || /mount|fiducial/i.test(v)) return 'hole'
   if (/^TP\d/i.test(ref)) return 'tp'
   if (/^(U|IC)\d/i.test(ref)) return 'ic'
   if (/^(D|LED)\d/i.test(ref)) return 'diode'

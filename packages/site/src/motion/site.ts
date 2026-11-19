@@ -2,6 +2,7 @@ import { gsap } from 'gsap'
 import { DECODE_IN } from '@silk-reel/choreo'
 import { initScroll, onScroll } from '../engine/scroll'
 import { prefersReducedMotion } from '../engine/env'
+import { plotHeadings } from './plot'
 
 const STEP = 1 / 15
 
@@ -56,7 +57,10 @@ function navState() {
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (!e.isIntersecting) continue
-      links.forEach((a) => { a.toggleAttribute('aria-current', a.dataset.nav === e.target.id) })
+      links.forEach((a) => {
+        if (a.dataset.nav === e.target.id) a.setAttribute('aria-current', 'location')
+        else a.removeAttribute('aria-current')
+      })
     }
   }, { rootMargin: '-45% 0px -50% 0px' })
   sections.forEach((s) => { io.observe(s) })
@@ -64,7 +68,8 @@ function navState() {
   const clear = new IntersectionObserver((entries) => {
     if (entries.some((e) => e.isIntersecting)) links.forEach((a) => { a.removeAttribute('aria-current') })
   }, { rootMargin: '-45% 0px -50% 0px' })
-  ;[document.getElementById('top'), document.querySelector('footer')].forEach((el) => { if (el) clear.observe(el) })
+  const footer = document.querySelector('footer')
+  if (footer) clear.observe(footer)
 }
 
 function copyButtons(root: ParentNode = document) {
@@ -90,6 +95,7 @@ export function boot() {
     html.classList.toggle('hd-pos', pos.some((el) => { const r = el.getBoundingClientRect(); return r.top <= 34 && r.bottom >= 34 && r.width >= innerWidth * 0.9 }))
   })
   decodeMark()
+  if (!prefersReducedMotion()) plotHeadings()
   document.querySelectorAll<HTMLElement>('[data-roll]').forEach((el) => { roll(el) })
   navState()
   copyButtons()

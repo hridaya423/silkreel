@@ -5,20 +5,33 @@ KiCad board in, release video out. TypeScript monorepo (npm workspaces):
 | package | role |
 |---|---|
 | `packages/ingest` | `.kicad_pcb` parser → `BoardModel` |
-| `packages/choreo` | style engine: `compileTimeline(board, FilmConfig)` → `Timeline` (`trace` scene or `glyph` tracks), palettes, aspect layout, cast hints |
+| `packages/choreo` | style engine: `compileTimeline(board, FilmConfig)` → `Timeline` (a `trace` scene, which also carries the `plot` and `montage` scores, or `glyph` tracks), palettes, aspect layout, cast hints, `boardTitle` |
 | `packages/render` | Canvas2D frame drawing (`drawFrame`) + WebGL2 bloom post pass + Remotion composition |
 | `packages/render-api` | Fastify API, serial render queue, `renderFilm()` (mp4/gif/webm-alpha/prores-alpha) |
-| `packages/studio` | Vite + Remotion Player web studio |
+| `packages/site` | Astro website; its `/studio/` page is the studio (previews in the browser, queues full renders on a local render API) |
 | `packages/cli` | `npm run reel -- board.kicad_pcb [flags]` |
 | `packages/metrics` | ffmpeg-based probes and the advisory numeric gate |
 
 ## Commands
 
 - `npx tsc --noEmit` (typecheck), `npx vitest run [path]` (tests), `npx eslint packages` (lint)
-- `npm run test:production`: builds the studio and smoke-tests it against a fake render API
 - `npm run reel -- fixtures/boards/icebreaker.kicad_pcb --aspect 9:16 --title iCEBreaker --version v1.0e -o /tmp/ice.mp4`
+- On the owner's machines a film never renders on the MacBook. `zsh scripts/render-strobe.sh <out-dir> ['<style>/<name glob>']` exports each set film's timeline here (`scripts/film-props.mts`), renders it with Strobe on the Windows PC (`ssh win-pc`, project copy in `D:/Honey/silk-reel-strobe`), converts it to the CLI's pixel format, and copies back `<style>/<name>.silent.mp4` (about 70 s a film). Stills and single frames may render here. The `npm run reel` line above is the product's own path, for users and for CI.
 - `npx tsx scripts/format-smoke.mts`: renders glasgow in all four formats to `/tmp/fmt` and prints ffprobe facts
-- Studio: `npm run start --workspace=@silk-reel/render-api` (port 3102) and `npm run dev --workspace=@silk-reel/studio` (port 3101)
+- `npm run pack:npx` builds the npx package into `dist-npm/`; `npm run pack:npx:smoke` installs the tarball in an empty folder and renders with it. Publishing needs the owner's word.
+- Studio: `npm run start --workspace=@silk-reel/render-api` (port 3102) and `npm run dev --workspace=@silk-reel/site` (studio at `http://localhost:4321/studio/`)
+
+## Styles
+
+`--style trace|plot|montage|glyph`. Three of them share the trace scene, so a change to `choreo/src/trace/scene.ts` can move all three.
+
+- Trace (the lit board): read `agent-notes/trace.md` before you change it; the renderer's traps are in the Gotchas below.
+- Blueprint (`plot`, a drafting film that ends on a title sheet): read `agent-notes/blueprint.md` before you change it.
+- Montage (the trailer cut: build, stop, release, poster): read `agent-notes/montage.md` before you change it.
+- Glyph (2D, the board's own parts and words as glyphs, one pull back): read `agent-notes/glyph.md` before you change it.
+- Every style is about one main chip. `heroPart` in `choreo/src/acts.ts` picks it: the IC that carries the most signals (nets shared with one to seven other parts), then pads, then nearness to the centre. The demo boards also carry hints by file name; judge a rule with no hints, as the tests do, because a user's board has none.
+- Every style takes the board's name and revision from `boardTitle(board, config)` in `choreo/src/board-title.ts`: the user's `--title` and `--version`, else the silk, else the title block.
+- Every film from the render path carries its score, cut to its own timeline's events. A change that moves an event changes the sound. Once the owner has approved a score, compare a new one with the approved file before it replaces it.
 
 ## Env vars
 
@@ -41,14 +54,14 @@ Deterministic tests pass on videos that look like slop. A change to anything vis
 
 - `npx tsx scripts/styleframes.mts --style glyph --boards icebreaker,glasgow --aspect 4:5 --at 0.02,0.3,0.62,0.8 [--animatic] [--smooth]` dumps per-phase stills of each board next to the same-phase still of the private reference, plus optional half-size animatics, into `review/styleframes/<style>-<stamp>/index.html` with an `intent.md` to fill.
 - `npx tsx scripts/trace-stills.mts glasgow,icebreaker 4:5 0.06,0.3,0.66,0.92` renders lit-trace stills at those phases plus one sheet per board into `review/trace-stills/` (about 2s a still). This is the fast look-loop for the trace renderer; a full video takes 1–2 min.
-- `npx tsx scripts/taste.mts <video.mp4> [--ref <ref.mp4>] [--out <dir>]` writes `taste.html`: synced side-by-side playback, shared scrub, frame step (arrows), A/B flip (f), and a 240px native-pixel loupe. If no `--ref`, it uses `reference.mp4` beside the video or re-extracts it from git.
+- `npx tsx scripts/taste.mts <video.mp4> [--ref <ref.mp4>] [--out <dir>]` writes `taste.html`: synced side-by-side playback, shared scrub, frame step (arrows), A/B flip (f), and a 240px native-pixel loupe. If no `--ref`, it uses `reference.mp4` beside the video, or the private `fixtures/reference/pcbanimation.mp4` if it is on disk.
 
 ## Gotchas
 
 - Imports inside `packages/render` must not carry `.js` extensions (the Remotion bundler resolves `.ts`/`.tsx` directly).
 - The post pass renders on its own WebGL canvas and returns it; the visible canvas stays 2d so the fallback path works when WebGL2 or shader compilation fails.
 - Trace renders through `trace-gl.ts`: a lit plate on a studio floor, component bodies from `choreo/src/trace/parts.ts`, a perspective camera, DOF, HDR bloom, and motion blur. Quality: `final` (5 subframes, 1.6× maps) for renders; `draft` (1 subframe) for the studio and `--draft`. `trace-maps.ts` rasterises board-space data maps (top/surf/fx) for only the region the camera sees, snapped to whole texels so thin copper does not crawl. `trace-draw.ts` is the flat fallback when WebGL2 is missing.
-- The trace film is one arc on a 24-beat grid: drawing (plan view, copper routes out of the hero) → object (tilt, mask, silk, parts set on paste, reflow snap) → a held breath → power-on (the only strong light) → hold. The score lives in `choreo/src/trace/scene.ts`: `TRACE_ACTS`, `ROLE_TIME` (energy after power-on) and `shotList` (four shots, cuts on beats 10, 15 and 20; the film ends on the held poster, with no fade). Camera math is `choreo/src/trace/camera.ts`, net roles are `trace/nets.ts`, and the sound is `render-api/src/score-audio.ts`: bundled CC0 recordings from `render-api/assets/sound/` (sources in its `CREDITS.md`) placed on the score's events and mastered to −14 LUFS. Only CC0 audio may be bundled there. `renderFilm` muxes it into mp4/webm/prores trace renders; `--no-audio` skips it.
+- The trace film is one arc of 360 frames on a 24-beat grid: the copper draws, the coat goes on, parts land once and never move again, a held breath, power-on (the only strong light), the crane to a held poster. The shot list is solved per board and per aspect in `choreo/src/trace/scene.ts` (`shotList`, `holdFrame`); its rules are in `agent-notes/trace.md`. The sound is `render-api/src/score-audio.ts`: bundled CC0 recordings from `render-api/assets/sound/` (sources in its `CREDITS.md`) placed on each style's events and mastered to −14 LUFS. Only CC0 audio may be bundled there. `renderFilm` muxes it into mp4/webm/prores renders; `--no-audio` skips it.
 - Lit surfaces stop below the bloom threshold (`LIT_MAX` in `trace-gl.ts`); only authored light blooms. Motion blur clamps to the current shot (`shotSpan`), so a cut never double-exposes. Write any oscillation in seconds with a period of at least four frames.
 - `npx tsx scripts/flicker.mts video.mp4` measures frame-to-frame shimmer per second; compare it before and after any change to the trace look.
 - WebGL: `gl.clear` respects `depthMask`. Re-open it before clearing, or last frame's depth survives (single stills look fine, videos go black). Never `pow(x, 2.0)` in GLSL with x possibly negative (NaN on Metal/ANGLE); use `sq()`.

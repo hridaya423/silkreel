@@ -8,12 +8,17 @@ class Pen {
   put(s: string) { this.out += s }
   open(attrs: string) { this.put(`<g ${attrs}>`) }
   close() { this.put('</g>') }
-  // KiCad's single-stroke lettering (newstroke, CC0), the face every board's silkscreen is printed in
+  // KiCad's single-stroke lettering (newstroke, CC0), the face every board's silkscreen is printed in; ~{NAME} sets an overbar, as KiCad writes active-low nets
   text(s: string, x: number, y: number, size: number, anchor: 'start' | 'middle' | 'end' = 'start', w = Math.max(0.22, size * 0.1), halo = false) {
     const k = size / 21
     const strokes: Pt[][] = []
     let pen = 0
-    for (const ch of s) {
+    let bar = -1
+    const chars = Array.from(s)
+    for (let c = 0; c < chars.length; c++) {
+      const ch = chars[c] ?? ' '
+      if (ch === '~' && chars[c + 1] === '{') { bar = pen; c++; continue }
+      if (ch === '}' && bar >= 0) { strokes.push([{ x: bar + 2, y: -15 }, { x: pen - 2, y: -15 }]); bar = -1; continue }
       const g = GLYPHS[ch.codePointAt(0) ?? 32] ?? GLYPHS[32]
       if (!g) continue
       const left = g.charCodeAt(0) - R

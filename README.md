@@ -72,7 +72,7 @@ silk reel reads KiCad 4 and later. It does not read Gerber, Eagle or Altium file
 | `--style` | `trace` · `glyph` · `plot` | `trace` |
 | `--aspect` | `4:5` · `1:1` · `9:16` · `16:9` | `4:5` |
 | `--format` | `mp4` · `gif` · `webm-alpha` · `prores-alpha` | `mp4` |
-| `--hero` | the part the film is about, e.g. `U3` | the IC with the most pads |
+| `--hero` | the part the film is about, e.g. `U3` | the chip that carries the most signals |
 | `--mask` | `green` · `black` · `white` · `blue` · `red` · `yellow` · `purple` | the board file's, else `green` |
 | `--palette` | `copper` · `mono` · `blueprint` · `phosphor` · `paper` | per style |
 | `--title`, `--version` | a title card with the board's name and version | none |
@@ -93,11 +93,11 @@ Post the MP4 as it is, or use `<name>.poster.png` as the cover. If you want to c
 
 The [browser studio](https://silkreel.hridya.tech/studio) previews every look for your own board. The tab reads your board file and does not upload it. It records WebM, saves stills, and writes the CLI command for the other formats.
 
-To render every format from a queue, run the full studio on your machine:
+To render every format from a queue, run the studio and the render API on your machine. The studio shows a Render button while the API answers:
 
 ```bash
 npm run start --workspace=@silk-reel/render-api   # render API on :3102
-npm run dev --workspace=@silk-reel/studio         # studio on :3101
+npm run dev --workspace=@silk-reel/site           # studio at http://localhost:4321/studio/
 ```
 
 ## How it works
@@ -107,7 +107,7 @@ npm run dev --workspace=@silk-reel/studio         # studio on :3101
 3. [`render`](packages/render) draws each frame. Trace uses WebGL2 with depth of field, HDR bloom and motion blur.
 4. [`render-api`](packages/render-api) encodes the frames with Remotion and ffmpeg, and adds the score, mastered to −14 LUFS.
 
-[`cli`](packages/cli), [`studio`](packages/studio), [`site`](packages/site) and [`metrics`](packages/metrics) hold the CLI, the local studio, the website and the video probes.
+[`cli`](packages/cli), [`site`](packages/site) and [`metrics`](packages/metrics) hold the CLI, the website with its studio, and the video probes.
 
 ## Development
 
@@ -115,7 +115,6 @@ npm run dev --workspace=@silk-reel/studio         # studio on :3101
 npx tsc --noEmit         # typecheck
 npx vitest run           # tests
 npx eslint packages      # lint
-npm run test:production  # build the studio and smoke-test it
 ```
 
 Every change to how a film looks goes through a full-video review. [AGENTS.md](AGENTS.md) has the commands and the rubric.
@@ -125,7 +124,8 @@ Every change to how a film looks goes through a full-video review. [AGENTS.md](A
 - **Sample boards:** [iCEBreaker](https://github.com/icebreaker-fpga/icebreaker) © 2019 1BitSquared, CC BY-SA 4.0. [Glasgow](https://github.com/GlasgowEmbedded/glasgow) rev C3, Glasgow Embedded, 0BSD. StickHub, the ECC83 preamp, the ColdFire dev kit and the video board are KiCad demo projects.
 - **Sound:** CC0 recordings from Freesound, listed in [CREDITS.md](packages/render-api/assets/sound/CREDITS.md).
 - **STEP reading:** [occt-import-js](https://github.com/kovacsv/occt-import-js) and Open CASCADE Technology, both LGPL 2.1, used unmodified as an npm dependency.
-- **Type:** title cards use JetBrains Mono (SIL Open Font License 1.1, [`OFL.txt`](packages/render/src/assets/OFL.txt)), bundled so renders match on every machine.
+- **Type:** title cards use JetBrains Mono Medium and Bold, v2.304 from the [official release](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304) (SIL Open Font License 1.1, [`OFL.txt`](packages/render/src/assets/OFL.txt)), bundled so renders match on every machine.
+- **Drafting type:** the blueprint film letters its callouts, panel titles and title block in Silk Draft, a modified version of Routed Gothic by Darren Embry (the regular weight from the [author's repository](https://github.com/dse/routed-gothic), SIL Open Font License 1.1, [`OFL-RoutedGothic.txt`](packages/render/src/assets/OFL-RoutedGothic.txt)). Silk Draft gives the 1 a flag and a foot and slashes the 0, so designators never read as I and O; [`scripts/silk-draft-font.py`](scripts/silk-draft-font.py) builds it from the original, and it is renamed because "Routed Gothic" is a Reserved Font Name.
 
 ## License
 

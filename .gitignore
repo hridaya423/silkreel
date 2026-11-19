@@ -10,12 +10,14 @@ review/
 .devin/
 silk-reel-ad-film/
 .snapshots/
+dist-npm/
 
 # another artist's work, kept for private comparison only (AGENTS.md); never commit
 fixtures/reference/
 
 # agent and working notes stay local
 .claude/
+.context/
 docs/
 evidence/
 HANDOFF.md

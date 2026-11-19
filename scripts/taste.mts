@@ -2,7 +2,6 @@
 // Taste lab: side-by-side synced playback of a rendered video against the
 // private reference, with shared scrub, frame step, A/B flip, and a loupe.
 // usage: npx tsx scripts/taste.mts <video.mp4> [--ref review/<dir>/reference.mp4] [--out <dir>]
-import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
@@ -39,11 +38,9 @@ const refName = 'reference.mp4'
 const refPath = path.join(out, refName)
 if (ref && ref !== refPath) copyFileSync(ref, refPath)
 if (!existsSync(refPath)) {
-  try {
-    writeFileSync(refPath, execFileSync('git', ['-C', root, 'show', 'HEAD:fixtures/reference/pcbanimation.mp4']))
-  } catch {
-    throw new Error('no reference: pass --ref or have fixtures/reference/pcbanimation.mp4 in git history')
-  }
+  const fixture = path.join(root, 'fixtures/reference/pcbanimation.mp4')
+  if (!existsSync(fixture)) throw new Error(`no reference: pass --ref, or put the private reference at ${fixture}`)
+  copyFileSync(fixture, refPath)
 }
 
 writeFileSync(path.join(out, 'taste.html'), `<!doctype html><meta charset=utf-8>

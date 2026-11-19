@@ -2,7 +2,7 @@ import { ChoreoConfigError } from './errors'
 import { clamp } from './curves'
 import { ASPECT_SIZE } from './layout'
 import { PALETTES, resolvePalette } from './palette'
-import type { Aspect, CastHints, FilmConfig, Knobs, MaskColor, Palette, PaletteId, StyleId, TitleCard } from './types'
+import type { Aspect, CastHints, FilmConfig, GlyphEnding, Knobs, MaskColor, Palette, PaletteId, StyleId, TitleCard } from './types'
 
 export const MASK_COLORS: readonly MaskColor[] = ['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple']
 
@@ -17,6 +17,8 @@ export interface ResolvedConfig {
   palette: Palette
   title: TitleCard | undefined
   credit: boolean
+  power: 'lamps' | 'pulse' | 'leds' | 'routes'
+  ending: GlyphEnding
   transparent: boolean
   knobs: ResolvedKnobs
   seed: number | null
@@ -60,8 +62,8 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     throw new ChoreoConfigError('config', config, 'expected a FilmConfig object')
   }
   const styleRaw: unknown = config.style
-  if (styleRaw !== undefined && styleRaw !== 'trace' && styleRaw !== 'glyph' && styleRaw !== 'plot') {
-    throw new ChoreoConfigError('style', styleRaw, "expected 'trace', 'glyph' or 'plot'")
+  if (styleRaw !== undefined && styleRaw !== 'trace' && styleRaw !== 'glyph' && styleRaw !== 'plot' && styleRaw !== 'montage') {
+    throw new ChoreoConfigError('style', styleRaw, "expected 'trace', 'glyph', 'plot' or 'montage'")
   }
   const style: StyleId = styleRaw ?? 'trace'
 
@@ -73,7 +75,7 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
 
   const paletteIdRaw: unknown = config.palette
   if (paletteIdRaw !== undefined && !Object.hasOwn(PALETTES, paletteIdRaw as string)) {
-    throw new ChoreoConfigError('palette', paletteIdRaw, "expected 'mono', 'copper', 'blueprint', 'phosphor' or 'paper'")
+    throw new ChoreoConfigError('palette', paletteIdRaw, "expected 'mono', 'copper', 'blueprint', 'phosphor', 'paper' or 'cyanotype'")
   }
 
   if (config.accent !== undefined && !/^#[0-9a-fA-F]{6}$/.test(config.accent)) {
@@ -94,9 +96,21 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     if (version !== undefined && (typeof version !== 'string' || version.length > 24)) {
       throw new ChoreoConfigError('title.version', version, 'expected 0-24 characters')
     }
+    const lines = (titleRaw as TitleCard).lines
+    if (lines !== undefined && (!Array.isArray(lines) || lines.length > 3 || lines.some((l) => typeof l !== 'string' || l.length < 1 || l.length > 48))) {
+      throw new ChoreoConfigError('title.lines', lines, 'expected up to three lines of 1-48 characters')
+    }
     title = config.title
   }
 
+  const power: unknown = config.power
+  if (power !== undefined && power !== 'lamps' && power !== 'pulse' && power !== 'leds' && power !== 'routes') {
+    throw new ChoreoConfigError('power', power, "expected 'lamps', 'pulse', 'leds' or 'routes'")
+  }
+  const ending: unknown = config.ending
+  if (ending !== undefined && ending !== 'parts' && ending !== 'routes') {
+    throw new ChoreoConfigError('ending', ending, "expected 'parts' or 'routes'")
+  }
   if (config.credit !== undefined && typeof config.credit !== 'boolean') {
     throw new ChoreoConfigError('credit', config.credit, 'expected a boolean')
   }
@@ -202,6 +216,8 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     palette: resolvePalette(style, paletteIdRaw as PaletteId | undefined, config.accent),
     title,
     credit: config.credit === true,
+    power: config.power ?? 'routes',
+    ending: config.ending ?? 'parts',
     transparent,
     knobs: { texts: texts.value, tempo: tempo.value },
     seed: config.seed,
@@ -217,9 +233,18 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
   }
 }
 
-/** the loop's content doesn't scale with board size — a fixed 11.2s glyph cycle, 12s for trace */
+/** the glyph film is this many beats: the field stands whole, strips, and the board's name holds to the last frame */
+export const GLYPH_FILM_BEATS = 34
+/** the score the film is cut from: the film opens four beats into it, just after the routes complete, and ends a beat before it would return to them */
+export const GLYPH_LOOP_BEATS = GLYPH_FILM_BEATS + 3
+/** the beats round 17's 21-beat film gained, all between the plan and the field */
+export const GLYPH_ADDED_BEATS = 5
+const GLYPH_SCORE_SECONDS = 11.2
+const GLYPH_SCORE_BEATS = 24
+
+/** the film's content doesn't scale with board size — a fixed 9.8 s glyph film, 12 s for trace */
 function autoDurationSeconds(style: StyleId): number {
-  return style === 'glyph' ? 11.2 : 12
+  return style === 'glyph' ? (GLYPH_SCORE_SECONDS * GLYPH_FILM_BEATS) / GLYPH_SCORE_BEATS : 12
 }
 
 export function planDuration(resolved: Pick<ResolvedConfig, 'durationSeconds' | 'fps' | 'style' | 'knobs'>): DurationPlan {

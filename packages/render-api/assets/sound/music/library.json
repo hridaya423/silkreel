@@ -1,0 +1,482 @@
+[
+  {
+    "id": "trace-there-ain-t-nothin",
+    "style": "trace",
+    "file": "trace-there-ain-t-nothin.opus",
+    "title": "There Ain't Nothin",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/orphaned-media/there-aint-nothin/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 6.67,
+      "centroid": 1794,
+      "level": -11.1
+    }
+  },
+  {
+    "id": "trace-deploy-the-drones",
+    "style": "trace",
+    "file": "trace-deploy-the-drones.opus",
+    "title": "Deploy The Drones",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/moody-beats/deploy-the-drones/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 9.0,
+      "centroid": 2267,
+      "level": -18.5
+    }
+  },
+  {
+    "id": "trace-dungeon-of-fear",
+    "style": "trace",
+    "file": "trace-dungeon-of-fear.opus",
+    "title": "Dungeon Of Fear",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/audio-drama-soundtracks-album-four/dungeon-of-fear-1/",
+    "bpm": 120,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 14.17,
+      "centroid": 521,
+      "level": -13.5
+    }
+  },
+  {
+    "id": "trace-little-green-men",
+    "style": "trace",
+    "file": "trace-little-green-men.opus",
+    "title": "Little Green Men",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/stranger-than-fiction-halloween-sci-fi/little-green-men/",
+    "bpm": 80,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 9.0,
+      "centroid": 555,
+      "level": -15.8
+    }
+  },
+  {
+    "id": "trace-soft-reset",
+    "style": "trace",
+    "file": "trace-soft-reset.opus",
+    "title": "Soft Reset",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/we-drove-all-night-game-soundtrack/soft-reset/",
+    "bpm": 80,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 3.5,
+      "centroid": 2432,
+      "level": -20.9
+    }
+  },
+  {
+    "id": "trace-memory-fragments",
+    "style": "trace",
+    "file": "trace-memory-fragments.opus",
+    "title": "Memory Fragments",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/machine-learning/memory-fragments/",
+    "bpm": 120,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 9.83,
+      "centroid": 440,
+      "level": -14.6
+    }
+  },
+  {
+    "id": "trace-utopian-future",
+    "style": "trace",
+    "file": "trace-utopian-future.opus",
+    "title": "Utopian Future",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/machine-learning/utopian-future/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 4.17,
+      "centroid": 627,
+      "level": -12.9
+    }
+  },
+  {
+    "id": "montage-storm-chasers",
+    "style": "montage",
+    "file": "montage-storm-chasers.opus",
+    "title": "The Storm Chasers",
+    "author": "Eldritch Grim",
+    "url": "https://opengameart.org/content/storm-chasers",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 10.33,
+      "centroid": 2093,
+      "level": -11.7
+    }
+  },
+  {
+    "id": "montage-epic-boss-battle",
+    "style": "montage",
+    "file": "montage-epic-boss-battle.opus",
+    "title": "Epic Boss Battle",
+    "author": "Juhani Junkala",
+    "url": "https://opengameart.org/content/boss-battle-music",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 4.33,
+      "centroid": 2278,
+      "level": -9.9
+    }
+  },
+  {
+    "id": "montage-siberian-intro",
+    "style": "montage",
+    "file": "montage-siberian-intro.opus",
+    "title": "Siberian Intro",
+    "author": "Vehicle",
+    "url": "https://opengameart.org/content/siberian-intro",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 4.67,
+      "centroid": 842,
+      "level": -18.6
+    }
+  },
+  {
+    "id": "montage-jailbreak-whispers",
+    "style": "montage",
+    "file": "montage-jailbreak-whispers.opus",
+    "title": "Jailbreak Whispers",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/hide-and-sneak/jailbreak-whispers/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 4.0,
+      "centroid": 466,
+      "level": -19.1
+    }
+  },
+  {
+    "id": "montage-kiddie-thief",
+    "style": "montage",
+    "file": "montage-kiddie-thief.opus",
+    "title": "Kiddie Thief",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/hide-and-sneak/kiddie-thief/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 2.0,
+      "centroid": 780,
+      "level": -16.6
+    }
+  },
+  {
+    "id": "montage-triumph-of-heroes",
+    "style": "montage",
+    "file": "montage-triumph-of-heroes.opus",
+    "title": "Triumph Of Heroes",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/audio-drama-soundtracks-album-four/triumph-of-heroes-1/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 12.17,
+      "centroid": 743,
+      "level": -20.4
+    }
+  },
+  {
+    "id": "plot-nightshift",
+    "style": "plot",
+    "file": "plot-nightshift.opus",
+    "title": "Nightshift",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/nightshift-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 7.83,
+      "centroid": 399,
+      "level": -14.9
+    }
+  },
+  {
+    "id": "plot-nubia",
+    "style": "plot",
+    "file": "plot-nubia.opus",
+    "title": "Nubia",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/nubia-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 14.5,
+      "centroid": 631,
+      "level": -16.8
+    }
+  },
+  {
+    "id": "plot-above-the-clouds",
+    "style": "plot",
+    "file": "plot-above-the-clouds.opus",
+    "title": "Above The Clouds",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/above-the-clouds-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 15.67,
+      "centroid": 723,
+      "level": -18.3
+    }
+  },
+  {
+    "id": "plot-nebula-pi",
+    "style": "plot",
+    "file": "plot-nebula-pi.opus",
+    "title": "Nebula Pi",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/nebula-pi-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 13.67,
+      "centroid": 734,
+      "level": -16.9
+    }
+  },
+  {
+    "id": "plot-liquid-surreal-dreaming",
+    "style": "plot",
+    "file": "plot-liquid-surreal-dreaming.opus",
+    "title": "Liquid Surreal Dreaming",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/audio-drama-soundtracks-album-four/liquid-surreal-dreaming-1/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 15.0,
+      "centroid": 1501,
+      "level": -16.0
+    }
+  },
+  {
+    "id": "plot-lullabies-for-the-end-of-the-world",
+    "style": "plot",
+    "file": "plot-lullabies-for-the-end-of-the-world.opus",
+    "title": "Lullabies For The End Of The World #5",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/lullabies-for-the-end-of-the-world/lullabies-for-the-end-of-the-world-5/",
+    "bpm": 80,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 3.0,
+      "centroid": 731,
+      "level": -21.0
+    }
+  },
+  {
+    "id": "plot-goosebumps",
+    "style": "plot",
+    "file": "plot-goosebumps.opus",
+    "title": "Goosebumps",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/goosebumps-master/",
+    "bpm": 120,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 11.0,
+      "centroid": 973,
+      "level": -18.8
+    }
+  },
+  {
+    "id": "plot-forgotten-keep-sakes",
+    "style": "plot",
+    "file": "plot-forgotten-keep-sakes.opus",
+    "title": "Forgotten Keep Sakes",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/forgotten-keep-sakes-lofi-sad-mp3/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 3.83,
+      "centroid": 835,
+      "level": -11.0
+    }
+  },
+  {
+    "id": "glyph-dark-dyne",
+    "style": "glyph",
+    "file": "glyph-dark-dyne.opus",
+    "title": "Dark Dyne",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/dark-dyne-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 14.83,
+      "centroid": 253,
+      "level": -15.0
+    }
+  },
+  {
+    "id": "glyph-factory-saw",
+    "style": "glyph",
+    "file": "glyph-factory-saw.opus",
+    "title": "Factory Saw",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/factory-saw-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 18.33,
+      "centroid": 304,
+      "level": -13.0
+    }
+  },
+  {
+    "id": "glyph-scene-scanner",
+    "style": "glyph",
+    "file": "glyph-scene-scanner.opus",
+    "title": "Scene Scanner",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/scene-scanner-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 5.33,
+      "centroid": 393,
+      "level": -15.0
+    }
+  },
+  {
+    "id": "glyph-edge-of-the-sky",
+    "style": "glyph",
+    "file": "glyph-edge-of-the-sky.opus",
+    "title": "Edge Of The Sky",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/edge-of-the-sky-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 15.33,
+      "centroid": 346,
+      "level": -18.4
+    }
+  },
+  {
+    "id": "glyph-outer-scrolls",
+    "style": "glyph",
+    "file": "glyph-outer-scrolls.opus",
+    "title": "Outer Scrolls",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/outer-scrolls-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 15.17,
+      "centroid": 809,
+      "level": -15.6
+    }
+  },
+  {
+    "id": "glyph-purple-ice-crystals",
+    "style": "glyph",
+    "file": "glyph-purple-ice-crystals.opus",
+    "title": "Purple Ice Crystals",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/purple-ice-crystals-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 13.67,
+      "centroid": 1102,
+      "level": -19.0
+    }
+  },
+  {
+    "id": "glyph-air-drops",
+    "style": "glyph",
+    "file": "glyph-air-drops.opus",
+    "title": "Air Drops",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/air-drops-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 11.83,
+      "centroid": 228,
+      "level": -18.3
+    }
+  },
+  {
+    "id": "glyph-mars-colony",
+    "style": "glyph",
+    "file": "glyph-mars-colony.opus",
+    "title": "Mars Colony",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/100-ambient-atmospheric-soundtracks-straylight-drones-collection/mars-colony-master/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 16.5,
+      "centroid": 608,
+      "level": -22.3
+    }
+  },
+  {
+    "id": "montage-pantheon",
+    "style": "montage",
+    "file": "montage-pantheon.opus",
+    "title": "Pantheon",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/phonk-aura-farming/pantheon/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 5.0,
+      "centroid": 3350,
+      "level": -13.4
+    }
+  },
+  {
+    "id": "montage-spooky-systems",
+    "style": "montage",
+    "file": "montage-spooky-systems.opus",
+    "title": "Spooky Systems",
+    "author": "John Bartmann",
+    "url": "https://freemusicarchive.org/music/John_Bartmann/moody-beats/spooky-systems/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 5.33,
+      "centroid": 2118,
+      "level": -15.3
+    }
+  },
+  {
+    "id": "trace-serial",
+    "style": "trace",
+    "file": "trace-serial.opus",
+    "title": "Serial",
+    "author": "HoliznaCC0",
+    "url": "https://freemusicarchive.org/music/holiznacc0/after-dark/serial-1/",
+    "bpm": 0,
+    "drop": 11.0,
+    "traits": {
+      "onsets": 6.0,
+      "centroid": 3885,
+      "level": -11.2
+    }
+  }
+]

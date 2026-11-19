@@ -47,6 +47,9 @@ html.lenis, html.lenis body { height: auto; }
 .lt svg { display: block; max-width: 100%; height: auto; overflow: visible; }
 .lt path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
 .lt .lt--accent { color: var(--c-red); }
+.motion:not(.plot-off) :is(h1, h2):not([data-plot-hold]) .lt:not([data-plotted], [data-plotting]) svg { visibility: hidden; }
+.lt[data-plotting] path.t { visibility: hidden; }
+.lt .lt__pen { fill: var(--c-red); stroke: none; }
 .m { font-size: var(--t-m); line-height: 1.45; letter-spacing: -0.005em; }
 .lede { font-size: var(--t-m); line-height: 1.45; color: var(--c-muted); max-width: 36ch; letter-spacing: -0.005em; }
 .lede strong, .body strong { color: var(--c-ink); font-weight: 500; }
@@ -89,7 +92,7 @@ html:not(.motion) :is(a, button) .roll__a { translate: none; }
 /* Inline links in prose keep an underline that draws in ink on hover */
 .prose-link {
   background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat, linear-gradient(var(--c-line-2), var(--c-line-2)) 0 100% / 100% 1px no-repeat;
-  padding-bottom: 1px; transition: background-size var(--t3) var(--seat), color var(--t2) var(--soft);
+  padding: 4px 0 1px; transition: background-size var(--t3) var(--seat), color var(--t2) var(--soft);
 }
 .prose-link:hover { background-size: 100% 1px, 100% 1px; color: var(--c-ink); }
 

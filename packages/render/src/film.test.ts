@@ -104,13 +104,15 @@ describe('drawFrame', () => {
     const scene = buildScene(timeline)
     const drawn = drawFrame(asCtx(currentRecorder()), timeline, scene, Math.floor(timeline.totalFrames * 0.8))
     expect(drawn).toBeGreaterThan(0)
-    expect(callsOf('stroke').length + callsOf('fillText').length).toBeGreaterThan(0)
+    expect(callsOf('stroke').length + callsOf('fill').length + callsOf('fillText').length).toBeGreaterThan(0)
   })
 
   it('mirrored atoms render with a flipped transform', () => {
     const timeline = compiled(board)
     const scene = buildScene(timeline)
-    drawFrame(asCtx(currentRecorder()), timeline, scene, Math.floor(timeline.totalFrames * 0.6))
+    const plan = timeline.formations.find((f) => f.id === 'plan')
+    if (plan === undefined) throw new Error('no plan formation')
+    drawFrame(asCtx(currentRecorder()), timeline, scene, Math.floor(((plan.startPhase + plan.endPhase) / 2) * timeline.totalFrames))
     const flips = callsOf('scale').filter((c) => (c.args[0] as number) < 0 || (c.args[1] as number) < 0)
     expect(flips.length).toBeGreaterThan(0)
   })
@@ -154,7 +156,7 @@ describe('drawFrame', () => {
     if (p === undefined) throw new Error('no multi-copy text placement')
     // mid-hold step for this placement: safely inside the alpha=1 plateau
     const hold = (((p.outStep - p.inStep) % timeline.steps) + timeline.steps) % timeline.steps
-    const midFrame = Math.round((p.inStep + Math.floor(hold / 2)) * (timeline.fps / 15)) % timeline.totalFrames
+    const midFrame = Math.round(((p.inStep + Math.floor(hold / 2)) % timeline.steps) * (timeline.fps / 15))
     // render only this placement, mid-hold: every atom is lit
     const single: GlyphTimeline = { ...timeline, placements: [p] }
     const scene = buildScene(single)
@@ -171,12 +173,32 @@ describe('drawFrame', () => {
     }
   })
 
+  it('asks the film whether each word is wholly in frame, by its true width, and draws a word the frame cuts not at all', () => {
+    const timeline = compiled(boardModel('icebreaker.kicad_pcb'))
+    const p = timeline.placements.find((q) => timeline.cast.find((g) => g.id === q.glyphId)?.kind === 'text' && q.glyphId !== 'txt:title')
+    if (p === undefined) throw new Error('no word')
+    const hold = (((p.outStep - p.inStep) % timeline.steps) + timeline.steps) % timeline.steps
+    const midFrame = Math.round(((p.inStep + Math.floor(hold / 2)) % timeline.steps) * (timeline.fps / 15))
+    const single: GlyphTimeline = { ...timeline, placements: [p] }
+    const scene = buildScene(single)
+    const text = timeline.cast.find((g) => g.id === p.glyphId)?.text ?? ''
+    const asked: number[][] = []
+    const kept = new RecordingCtx()
+    drawGlyphFrame(asCtx(kept), single, scene, midFrame, { whole: (x, y, hw, hh) => (asked.push([x, y, hw, hh]), 1) })
+    expect(asked.length).toBe(p.atoms.length)
+    for (const [, , hw, hh] of asked) expect(Math.max(hw as number, hh as number) / Math.min(hw as number, hh as number)).toBeCloseTo(0.6 * text.length, 6)
+    expect(kept.calls.filter((c) => c.method === 'fillText').length).toBe(p.atoms.length)
+    const cut = new RecordingCtx()
+    drawGlyphFrame(asCtx(cut), single, scene, midFrame, { whole: () => 0 })
+    expect(cut.calls.filter((c) => c.method === 'fillText').length).toBe(0)
+  })
+
   it('uses a constant screen-space hairline regardless of glyph scale', () => {
     const timeline = compiled(board)
     const scene = buildScene(timeline)
-    // the frame act's hold: the hero and tiny cells coexist, so glyph-space widths differ
-    const frame = timeline.formations.find((f) => f.id === 'frame')
-    if (frame === undefined) throw new Error('no frame formation')
+    // the plan's hold: parts at many sizes coexist, so glyph-space widths differ
+    const frame = timeline.formations.find((f) => f.id === 'plan')
+    if (frame === undefined) throw new Error('no plan formation')
     const mid = ((frame.startPhase + Math.min(frame.endPhase, 1)) / 2) * timeline.totalFrames
     drawFrame(asCtx(currentRecorder()), timeline, scene, Math.floor(mid))
     // lineWidth is set in glyph space as inkPx/sizePx — the recorded widths

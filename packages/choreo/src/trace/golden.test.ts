@@ -20,12 +20,12 @@ describe('approved trace schedule', () => {
   it('pins seg/pad counts and the earliest growth times', () => {
     const segCount = scene.layers.reduce((n, l) => n + l.segs.length / 7, 0)
     expect(segCount).toMatchInlineSnapshot(`4715`)
-    expect(scene.pads.length).toMatchInlineSnapshot(`1145`)
+    expect(scene.pads.length).toMatchInlineSnapshot(`1137`)
     expect(scene.beats).toMatchInlineSnapshot(`
       {
         "growth": [
           0,
-          0.22916666666666666,
+          0.20833333333333331,
         ],
         "hold": [
           0.8333333333333333,
@@ -40,12 +40,12 @@ describe('approved trace schedule', () => {
           0.041666666666666664,
         ],
         "silk": [
-          0.375,
-          0.4375,
+          0.29166666666666663,
+          0.31249999999999994,
         ],
         "zones": [
-          0.35416666666666663,
-          0.3958333333333333,
+          0.14583333333333331,
+          0.1847222222222222,
         ],
       }
     `)
@@ -56,11 +56,11 @@ describe('approved trace schedule', () => {
       .map((t) => Math.round(t * 1e4) / 1e4)
     expect(t0s).toMatchInlineSnapshot(`
       [
-        -0.0208,
-        -0.0208,
-        -0.0208,
-        -0.0208,
-        -0.0207,
+        -0.3362,
+        -0.3361,
+        -0.3359,
+        -0.3357,
+        -0.3356,
       ]
     `)
   })

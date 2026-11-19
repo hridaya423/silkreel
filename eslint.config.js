@@ -78,12 +78,12 @@ export default tseslint.config(
     files: [
       'packages/ingest/src/**/*.ts',
       'packages/choreo/src/**/*.ts',
-      'packages/render/src/**/*.ts',
-      'packages/studio/src/**/*.{ts,tsx}'
+      'packages/render/src/**/*.ts'
     ],
-    ignores: ['**/*.test.ts', 'packages/studio/src/board-server.ts', 'packages/studio/src/studio-server.ts'],
+    ignores: ['**/*.test.ts'],
     rules: {
-      'no-restricted-imports': ['error', NODE_BUILTIN_RESTRICTION]
+      'no-restricted-imports': ['error', NODE_BUILTIN_RESTRICTION],
+      'no-restricted-globals': ['error', { name: 'process', message: 'these packages run in the browser, where process does not exist' }]
     }
   },
   {
@@ -91,8 +91,7 @@ export default tseslint.config(
       'packages/metrics/src/cli.ts',
       'packages/cli/src/cli.ts',
       'packages/render-api/src/scripts/render-canonical.ts',
-      'packages/render-api/src/server.ts',
-      'packages/studio/src/studio-server.ts'
+      'packages/render-api/src/server.ts'
     ],
     rules: {
       'no-console': 'off'

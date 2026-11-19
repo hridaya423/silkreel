@@ -31,15 +31,17 @@
     "frame-sheet": "node scripts/frame-sheet.mjs",
     "review": "tsx scripts/review.ts",
     "reel": "tsx packages/cli/src/cli.ts",
-    "test:production": "node scripts/production-smoke.mjs"
+    "pack:npx": "tsx scripts/pack/build.mts",
+    "pack:npx:smoke": "tsx scripts/pack/smoke.mts"
   },
   "dependencies": {
-    "@remotion/bundler": "4.0.515",
-    "@remotion/renderer": "4.0.515",
+    "@remotion/bundler": "4.0.541",
+    "@remotion/renderer": "4.0.541",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
     "@types/node": "^24.3.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

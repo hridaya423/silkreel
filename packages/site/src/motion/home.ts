@@ -1,4 +1,4 @@
-import { ASPECT_SIZE, PALETTES } from '@silk-reel/choreo'
+import { PALETTES } from '@silk-reel/choreo'
 import type { Aspect, PaletteId, TraceTimeline } from '@silk-reel/choreo'
 import { drawPlotFrame } from '@silk-reel/render/film'
 import { World, drawStill } from '../world/world'
@@ -6,21 +6,27 @@ import { filmOf, filmOwnBoard } from '../world/films'
 import { boards, traceFilms } from '../data/site'
 import { prefersReducedMotion } from '../engine/env'
 import { setupStage } from '../cut/stage'
+import { setupFrames, setupLooks, setupLanding } from './sections'
 import { rollTo } from './site'
 
 const $ = (s: string, r: ParentNode = document) => r.querySelector<HTMLElement>(s)
 const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document): T[] => [...r.querySelectorAll<T>(s)]
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v))
-const pad = (v: number, n = 2) => String(Math.floor(v)).padStart(n, '0')
-const tc = (frame: number) => `${pad(frame / 30 / 60)}:${pad((frame / 30) % 60)}.${pad(((frame / 30) % 1) * 100)}`
 
 export function setupHome() {
   const reduced = prefersReducedMotion()
   const html = document.documentElement
   const film = $('[data-stage]')
-  if (film) setupStage(film, reduced)
+  const cut = film ? setupStage(film, reduced) : undefined
+  const frames = $('[data-frames]')
+  if (frames) setupFrames(frames, reduced)
+  const looks = $('[data-looks]')
+  if (looks) setupLooks(looks, reduced)
+
+  setupLanding(reduced)
 
   const input = document.querySelector<HTMLInputElement>('[data-file]')
+  $('[data-try]')?.addEventListener('click', () => input?.click())
 
   /* ---------- one command: each word picks a value, the monitor plays the film the line would render ---------- */
   type Style = 'glyph' | 'trace' | 'plot'
@@ -29,32 +35,25 @@ export function setupHome() {
   const monitorVideo = document.querySelector<HTMLVideoElement>('[data-monitor-video]')
   const monitor = new World(monitorCanvas ?? document.createElement('canvas'), { reduced })
   const STILL = 240
-  const state: { board: string; style: Style; aspect: Aspect; ink: PaletteId } = { board: 'icebreaker', style: 'trace', aspect: '16:9', ink: 'mono' }
+  const state: { board: string; style: Style; aspect: Aspect; ink: PaletteId } = { board: 'glasgow', style: 'trace', aspect: '16:9', ink: 'mono' }
   try { const s = localStorage.getItem('sr-ink'); if (s && s in PALETTES) state.ink = s as PaletteId } catch { /* private mode */ }
   const names = new Map<string, { name: string; file: string; own?: true }>(boards.map((b) => [b.id, { name: b.name, file: `${b.id}.kicad_pcb` }]))
   monitor.setPalette(state.ink, { instant: true })
 
-  const stage = $('[data-monitor-stage]')
-  const frameRect = () => ({ x: 0, y: 0, w: stage?.clientWidth ?? 0, h: stage?.clientHeight ?? 0 })
-  // the site ships each trace film at 16:9 only; the command still renders the chosen aspect
-  const shown = (): Aspect => (state.style === 'glyph' ? state.aspect : '16:9')
+  const frameRect = () => ({ x: 0, y: 0, w: monitorCanvas?.clientWidth ?? 0, h: monitorCanvas?.clientHeight ?? 0 })
+  // the site ships plot films, and trace films of every board but Glasgow, at 16:9 only; the command still renders the chosen aspect
+  const shown = (): Aspect => (state.style === 'plot' || (state.style === 'trace' && state.board !== 'glasgow') ? '16:9' : state.aspect)
   const monitorNote = $('[data-monitor-note]')
   const fitStage = () => {
-    monitorStage?.style.setProperty('--ar', shown().replace(':', ' / '))
+    if (monitorStage) monitorStage.dataset.style = state.style
+    monitorStage?.style.setProperty('--ar', shown() === '16:9' ? '2 / 1' : shown().replace(':', ' / '))
     monitorStage?.style.setProperty('--film-bg', state.style === 'trace' ? '#0b0b0b' : state.style === 'plot' ? '#ecede9' : PALETTES[state.ink].bg)
     if (monitorNote) {
       monitorNote.hidden = shown() === state.aspect
       monitorNote.textContent = `${state.style === 'plot' ? 'Plot' : 'Trace'} previews at 16:9 here. The command renders ${state.aspect}.`
     }
-    const px = ASPECT_SIZE[shown()]
-    const [w, h] = [$('[data-dim-w]'), $('[data-dim-h]')]
-    if (w) w.textContent = `${px.width} px`
-    if (h) h.textContent = `${px.height} px`
   }
-  const monitorTc = $('[data-monitor-tc]')
   const monitorCredit = $('[data-monitor-credit]')
-  monitor.onFrame((info) => { if (monitorTc && state.style === 'glyph') monitorTc.textContent = tc(info.frame) })
-  monitorVideo?.addEventListener('timeupdate', () => { if (monitorTc) monitorTc.textContent = tc(monitorVideo.currentTime * 30) })
   const tokVal = (k: string) => $(`[data-tok="${k}"] [data-tok-v]`)
   const tokens = () => {
     const b = names.get(state.board)
@@ -70,12 +69,14 @@ export function setupHome() {
       if (el) rollTo(el, v)
     }
     const pal = $('[data-tok="palette"]')
-    if (pal) pal.hidden = state.style === 'trace'
+    if (pal) pal.hidden = state.style !== 'glyph'
     const copy = $('[data-cmd-copy]')
-    if (copy) copy.dataset.copy = ['npm run reel --', ...tokens()].join(' ')
+    const line = ['npm run reel --', ...tokens()].join(' ')
+    if (copy) copy.dataset.copy = line
     for (const [k, v] of [['board', state.board], ['style', state.style], ['aspect', state.aspect], ['palette', state.ink]] as const) {
       $$(`[data-pick="${k}"] [data-v]`).forEach((o) => { o.setAttribute('aria-checked', String(o.dataset.v === v)) })
     }
+    $$('[data-rail]').forEach((o) => { o.setAttribute('aria-pressed', String(o.dataset.rail === state.aspect)) })
   }
   const monitorOn = () => { const r = monitorStage?.getBoundingClientRect(); return !!r && r.bottom > 0 && r.top < innerHeight }
   const plotCanvas = document.querySelector<HTMLCanvasElement>('[data-monitor-plot]')
@@ -88,23 +89,82 @@ export function setupHome() {
   }
   let plotTl: TraceTimeline | null = null
   let plotRun = false
+  let plotF = 0
+  let plotPrev = 0
   let plotLast = -1
-  let plotT0 = 0
-  const plotTick = (now: number) => {
-    if (!plotRun || !plotTl || !plotCanvas || !plotCtx) return
-    requestAnimationFrame(plotTick)
-    const f = reduced ? plotTl.totalFrames - 1 : Math.floor(((now - plotT0) / 1000) * plotTl.fps) % plotTl.totalFrames
+  const plotDraw = () => {
+    if (!plotTl || !plotCanvas || !plotCtx) return
+    const f = Math.floor(plotF)
     const w = Math.round(plotCanvas.clientWidth * Math.min(2, devicePixelRatio || 1))
     if (f === plotLast && plotCanvas.width === w) return
     if (plotCanvas.width !== w) { plotCanvas.width = w; plotCanvas.height = Math.round((w * plotTl.height) / plotTl.width) }
     drawPlotFrame(plotCtx, plotTl, f, w / plotTl.width)
     plotLast = f
-    if (monitorTc) monitorTc.textContent = tc(f)
+  }
+  const plotTick = (now: number) => {
+    if (!plotRun || !plotTl) return
+    requestAnimationFrame(plotTick)
+    plotF = (plotF + ((now - plotPrev) / 1000) * plotTl.fps) % plotTl.totalFrames
+    plotPrev = now
+    plotDraw()
   }
   const plotPlay = (on: boolean) => {
     if (on === plotRun) return
     plotRun = on
-    if (on) { plotT0 = performance.now(); requestAnimationFrame(plotTick) }
+    if (on) { plotPrev = performance.now(); requestAnimationFrame(plotTick) }
+  }
+
+  /* the monitor's own transport: play, pause and a seek line over whichever film is showing */
+  const playBtn = document.querySelector<HTMLButtonElement>('[data-monitor-play]')
+  const seekBar = document.querySelector<HTMLInputElement>('[data-monitor-seek]')
+  let held = reduced
+  const playing = () => !held && monitorOn()
+  const paintPlay = () => {
+    if (!playBtn) return
+    playBtn.toggleAttribute('data-playing', !held)
+    playBtn.setAttribute('aria-label', held ? 'Play' : 'Pause')
+  }
+  let glyphTotal = 1
+  monitor.onFrame((info) => { glyphTotal = info.film.tl.totalFrames })
+  const progress = () => {
+    if (state.style === 'trace') return monitorVideo?.duration ? monitorVideo.currentTime / monitorVideo.duration : 0
+    if (state.style === 'plot') return plotTl ? plotF / plotTl.totalFrames : 0
+    return monitor.frameNow() / Math.max(1, glyphTotal - 1)
+  }
+  const paintSeek = () => {
+    if (!seekBar || seekBar.matches(':active')) return
+    const v = Math.min(1, Math.max(0, progress()))
+    seekBar.value = String(Math.round(v * 1000))
+    seekBar.style.setProperty('--v', v.toFixed(4))
+  }
+  const run = () => {
+    const on = playing()
+    if (state.style === 'trace') { if (on) void monitorVideo?.play().catch(() => { /* the poster stays */ }); else monitorVideo?.pause() }
+    else if (state.style === 'plot') plotPlay(on)
+    else if (on) monitor.play()
+    else monitor.pause()
+  }
+  const loop = () => { paintSeek(); requestAnimationFrame(loop) }
+  requestAnimationFrame(loop)
+  playBtn?.addEventListener('click', () => { held = !held; paintPlay(); run() })
+  seekBar?.addEventListener('input', () => {
+    const v = Number(seekBar.value) / 1000
+    seekBar.style.setProperty('--v', v.toFixed(4))
+    if (state.style === 'trace') { if (monitorVideo?.duration) monitorVideo.currentTime = v * monitorVideo.duration * 0.999 }
+    else if (state.style === 'plot') { if (plotTl) { plotF = v * (plotTl.totalFrames - 1); plotDraw() } }
+    else {
+      const f = Math.round(v * (glyphTotal - 1))
+      if (held) monitor.scrub(f)
+      else monitor.seek(f)
+    }
+  })
+  paintPlay()
+
+  const traceSrc = () => {
+    const b = state.board
+    if (shown() !== '16:9') { const a = state.aspect.replace(':', 'x'); return { src: `/films/trace/${b}-${a}.mp4`, poster: `/films/trace/${b}-${a}-poster.webp` } }
+    if (b === 'glasgow') return { src: '/films/cut/glasgow-16x9.mp4', poster: '/films/cut/glasgow-16x9-poster.webp' }
+    return { src: `/films/trace/${b}-540.mp4`, poster: `/films/trace/${b}-poster.webp` }
   }
   const showMonitor = (instant = false) => {
     const trace = state.style === 'trace'
@@ -117,36 +177,40 @@ export function setupHome() {
     if (plot) {
       monitor.pause()
       const id = state.board
-      void plotOf(id).then((tl) => { if (state.board !== id || state.style !== 'plot') return; plotTl = tl; plotLast = -1; plotRun = false; plotPlay(monitorOn() || reduced) })
+      void plotOf(id).then((tl) => {
+        if (state.board !== id || state.style !== 'plot') return
+        plotTl = tl
+        plotLast = -1
+        plotRun = false
+        if (reduced) plotF = tl.totalFrames - 1
+        plotDraw()
+        plotPlay(playing())
+      })
     } else plotPlay(false)
     if (monitorVideo) {
       monitorVideo.hidden = !trace
       if (trace) {
-        const src = `/films/trace/${state.board}-540.mp4`
-        if (!monitorVideo.src.endsWith(src)) { monitorVideo.poster = `/films/trace/${state.board}-poster.webp`; monitorVideo.src = src }
-        if (!reduced && monitorOn()) void monitorVideo.play().catch(() => { /* the poster stays */ })
+        const { src, poster } = traceSrc()
+        if (!monitorVideo.src.endsWith(src)) { monitorVideo.poster = poster; monitorVideo.src = src }
+        if (playing()) void monitorVideo.play().catch(() => { /* the poster stays */ })
         monitor.pause()
       } else monitorVideo.pause()
     }
     if (!trace && !plot) {
       void filmOf(state.board, state.aspect).then((film) => {
         monitor.show(film, { decode: !instant })
-        monitor.setView({ rect: frameRect(), zoom: 1.45, cx: 0.5, cy: 0.5, fx: 0.5, fy: 0.5 }, { instant })
+        monitor.setView({ rect: frameRect(), zoom: 1.45, cx: 0.5, cy: 0.5, fx: 0.5, fy: 0.5 }, { instant: true })
         if (reduced) monitor.scrub(STILL)
-        else { monitor.seek(182); if (monitorOn()) monitor.play() }
+        else { monitor.seek(182); if (playing()) monitor.play() }
       })
     }
     paintCmd()
   }
+  looks?.addEventListener('lookchange', (event) => { pick('style', (event as CustomEvent<string>).detail) })
   showMonitor(true)
-  new IntersectionObserver(([e]) => {
-    const on = e?.isIntersecting === true && !reduced
-    if (state.style === 'trace') { if (on) void monitorVideo?.play().catch(() => { /* the poster stays */ }); else monitorVideo?.pause() }
-    else if (state.style === 'plot') plotPlay(on)
-    else if (on) monitor.play()
-    else monitor.pause()
-  }).observe(monitorStage ?? document.body)
-  addEventListener('resize', () => { monitor.setView({ rect: frameRect() }, { instant: true }) })
+  new IntersectionObserver(() => { run() }).observe(monitorStage ?? document.body)
+  if (monitorCanvas) new ResizeObserver(() => { monitor.setView({ rect: frameRect() }, { instant: true }) }).observe(monitorCanvas)
+  $$('[data-rail]').forEach((o) => { o.addEventListener('click', () => { pick('aspect', o.dataset.rail ?? '16:9') }) })
 
   const pick = (k: string, v: string) => {
     const noTrace = (id: string) => `Trace for ${names.get(id)?.name ?? id} renders on your machine. It plays as Glyph here.`
@@ -241,7 +305,7 @@ export function setupHome() {
     if (!/\.kicad_pcb$/i.test(file.name)) { toast('Use a .kicad_pcb file.'); return }
     if (file.size > 40e6) { toast('That file is over 40 MB. Use the command.'); return }
     toast(`Reading ${file.name}…`)
-    filmOwnBoard(file).then((b) => {
+    filmOwnBoard(file, cut?.aspect ?? '16:9').then(async (b) => {
       names.set(b.id, { name: b.name, file: file.name, own: true })
       const own = $('[data-pick="board"] [data-own]')
       if (own && !$(`[data-pick="board"] [data-v="${CSS.escape(b.id)}"]`)) {
@@ -262,8 +326,10 @@ export function setupHome() {
         own.before(o)
       }
       pick('board', b.id)
-      $('#make')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })
-      toast(`Loaded ${b.name}: ${b.footprints.toLocaleString('en-US')} parts.`)
+      const hero = film?.querySelector<HTMLElement>('.shot--hero')?.inert === false
+      const turned = hero && cut ? await cut.own(file.name.replace(/\.kicad_pcb$/i, ''), b.still, b.nets) : false
+      if (!turned) $('#make')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })
+      toast(`Loaded ${b.name}: ${b.footprints.toLocaleString('en-US')} parts, ${b.nets.facts.nets.toLocaleString('en-US')} nets, ${(b.nets.facts.copperMm / 1000).toFixed(2)} m of copper.`)
     }, (err: unknown) => { toast(`Could not read that board: ${err instanceof Error ? err.message : String(err)}`) })
   }
   input?.addEventListener('change', () => { takeFile(input.files?.[0]); input.value = '' })

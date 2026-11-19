@@ -26,7 +26,7 @@ const links = [
       <span class="sr-only">GitHub, </span>{stars !== null && <span class="hd__stars"><svg class="hd__star" viewBox="0 0 16 16" aria-hidden="true"><path class="hd__star-a" d="M8 8.5L8.0 1.3L9.76 6.07ZM8 8.5L14.85 6.28L10.85 9.43ZM8 8.5L12.23 14.32L8.0 11.5ZM8 8.5L3.77 14.32L5.15 9.43ZM8 8.5L1.15 6.28L6.24 6.07Z" /><path class="hd__star-b" d="M8 8.5L9.76 6.07L14.85 6.28ZM8 8.5L10.85 9.43L12.23 14.32ZM8 8.5L8.0 11.5L3.77 14.32ZM8 8.5L5.15 9.43L1.15 6.28ZM8 8.5L6.24 6.07L8.0 1.3Z" /><path class="hd__star-r" d="M8 8.5L8.0 1.3M8 8.5L9.76 6.07M8 8.5L14.85 6.28M8 8.5L10.85 9.43M8 8.5L12.23 14.32M8 8.5L8.0 11.5M8 8.5L3.77 14.32M8 8.5L5.15 9.43M8 8.5L1.15 6.28M8 8.5L6.24 6.07" /><path class="hd__star-o" d="M8.0 1.3L9.76 6.07L14.85 6.28L10.85 9.43L12.23 14.32L8.0 11.5L3.77 14.32L5.15 9.43L1.15 6.28L6.24 6.07Z" /></svg>{stars.toLocaleString('en-US')}<span class="sr-only"> stars</span></span>}
     </a>
     {path.startsWith('/studio')
-      ? <a class="btn btn--solid hd__cta" href="/docs/#install">Get the CLI</a>
+      ? <a class="btn hd__cta" href="/docs/#install">Get the CLI</a>
       : <a class="btn btn--solid hd__cta" href="/studio/">Open studio</a>}
   </div>
 </header>

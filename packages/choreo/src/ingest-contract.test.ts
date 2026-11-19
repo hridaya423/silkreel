@@ -6,11 +6,12 @@ describe('choreo precondition: ingest ids are consistent and footprint refs reso
   it('every element object carries a well-formed unique id within its class', () => {
     for (const name of ['ecc83-pp.kicad_pcb', 'StickHub.kicad_pcb', 'video.kicad_pcb']) {
       const model = parseKicadPcb(loadBoard(name), name)
-      const seen = new Map<string, string>()
+      const seen = new Set<string>()
       const claim = (id: string, where: string): void => {
         expect(id.length, `${where} empty id`).toBeGreaterThan(0)
         expect(id).toMatch(/^([a-z]+):\d+$/)
-        seen.set(`${where}:${id}`, id)
+        expect(seen.has(`${where}:${id}`), `${where} repeats id ${id}`).toBe(false)
+        seen.add(`${where}:${id}`)
       }
       for (const o of model.outline) claim(o.id, 'outline')
       for (const d of model.drill) claim(d.id, 'drill')

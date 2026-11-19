@@ -120,21 +120,34 @@ interface KicadTextInfo {
   rot: number
   height: number
   mirrored: boolean
+  justify: 'left' | 'right' | undefined
+  vjustify: 'top' | 'bottom' | undefined
   hidden: boolean
   layerId: string
+  /** footprint text marked unlocked: KiCad draws it at its file angle instead of keeping it upright */
+  unlocked: boolean
+}
+
+/** KiCad keeps footprint text upright: a draw angle in (90, 270] turns half a turn, into (−90, 90] */
+export function keepUpright(rot: number): number {
+  const r = ((rot % 360) + 360) % 360
+  return r > 90 && r <= 270 ? r - 180 : r > 270 ? r - 360 : r
 }
 
 function extractTextLike(node: SExprNode[], file: string): KicadTextInfo {
   const atoms = atomsAfterHead(node)
-  const valueAtomIndex = atoms[0] === 'user' || atoms[0] === 'reference' || atoms[0] === 'value' ? 1 : 0
+  const valueAtomIndex = head(node) === 'fp_text' && (atoms[0] === 'user' || atoms[0] === 'reference' || atoms[0] === 'value') ? 1 : 0
   const info: KicadTextInfo = {
     value: atoms[valueAtomIndex] ?? '',
     at: { x: 0, y: 0 },
     rot: 0,
     height: 1,
     mirrored: false,
+    justify: undefined,
+    vjustify: undefined,
     hidden: false,
-    layerId: 'F.SilkS'
+    layerId: 'F.SilkS',
+    unlocked: false
   }
   for (const child of children(node)) {
     if (!isList(child)) continue
@@ -147,6 +160,9 @@ function extractTextLike(node: SExprNode[], file: string): KicadTextInfo {
       }
       const rot = Number.parseFloat(atAtoms[2] ?? '')
       if (Number.isFinite(rot)) info.rot = rot
+      if (atAtoms.includes('unlocked')) info.unlocked = true
+    } else if (h === 'unlocked') {
+      info.unlocked = atomsAfterHead(child)[0] !== 'no'
     } else if (h === 'layer') {
       const layerAtoms = atomsAfterHead(child)
       info.layerId = layerAtoms[0] ?? info.layerId
@@ -165,6 +181,12 @@ function extractTextLike(node: SExprNode[], file: string): KicadTextInfo {
       }
       if (!info.mirrored && hasAtom(child, 'mirror')) info.mirrored = true
       if (hasAtom(child, 'hide')) info.hidden = true
+      const justify = firstListNamed(child, 'justify')
+      if (justify) {
+        const j = atomsAfterHead(justify)
+        info.justify = j.includes('left') ? 'left' : j.includes('right') ? 'right' : undefined
+        info.vjustify = j.includes('top') ? 'top' : j.includes('bottom') ? 'bottom' : undefined
+      }
     }
   }
   if (atoms.slice(valueAtomIndex + 1).includes('hide')) info.hidden = true
@@ -213,6 +235,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
   const declaredCopperLayerIds: string[] = []
   // KiCad 5 and older let a copper layer carry a free name ("Top", "GND"); its number says which layer it is
   const layerAlias = new Map<string, string>()
+  const layerNames: Record<string, string> = {}
   if (layersDecl) {
     for (const entry of children(layersDecl)) {
       if (!isList(entry)) continue
@@ -225,6 +248,8 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
         layerId = canonical
       }
       if (layerId !== undefined && layerKindOf(layerId) === 'copper') declaredCopperLayerIds.push(layerId)
+      const given = atomsAfterHead(entry)[2] ?? atomsAfterHead(entry)[0]
+      if (layerId !== undefined && given !== undefined && given !== layerId && layerKindOf(layerId) === 'copper') layerNames[layerId] = given
     }
   }
   const layerOf = (node: SExprNode[], fallback: string): string => {
@@ -395,32 +420,6 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const syRaw = sizeAtoms[1] ?? sizeAtoms[0] ?? '1'
     const sy = toNumber(syRaw, fileName, 'pad size')
     const globalPos = rotatePoint({ x: fpOrigin.x + localAt.x, y: fpOrigin.y + localAt.y }, fpOrigin, fpRot)
-    const eid = nextId(ids)
-    const key = `p:${eid}`
-    const netId = bindNet(netAtomOf(node), 'pad', key, fp.ref)
-    const pad: Pad = {
-      id: key,
-      pos: globalPos,
-      size: { x: sx, y: sy },
-      shape: padShapeOf(shapeToken),
-      // pad and text angles in the file are already board-absolute
-      rot: padRot,
-      footprintRef: fp.ref,
-      netId
-    }
-    padRecords.push({ key, pad, netId })
-    fp.padRefs.push(key)
-
-    if (padType === 'np_thru_hole') {
-      const drillNode = firstListNamed(node, 'drill')
-      const d = drillNode ? Number.parseFloat(atomsAfterHead(drillNode)[0] ?? String(Math.max(sx, sy))) : Math.max(sx, sy)
-      drill.push({ id: `d:${nextId(ids)}`, pos: globalPos, dia: Number.isFinite(d) && d > 0 ? d : Math.max(sx, sy), plated: false })
-    } else if (padType !== 'smd') {
-      const drillNode = firstListNamed(node, 'drill')
-      const d = drillNode ? Number.parseFloat(atomsAfterHead(drillNode)[0] ?? '0') : 0
-      if (Number.isFinite(d) && d > 0) drill.push({ id: `d:${nextId(ids)}`, pos: globalPos, dia: d, plated: true })
-    }
-
     const layerNodes = listsNamed(node, 'layers')
     const layerSpec = layerNodes.length > 0 ? atomsAfterHead(layerNodes[0] as SExprNode[]).map((t) => layerAlias.get(t) ?? t) : []
     const throughHole = padType === 'thru_hole' || padType === 'connect' || padType === 'np_thru_hole'
@@ -429,6 +428,41 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       declaredCopperLayerIds,
       throughHole ? ['F.Cu', 'B.Cu'] : ['F.Cu']
     )
+    const recordDrill = (): void => {
+      const drillNode = firstListNamed(node, 'drill')
+      const drillSizes = drillNode ? atomsAfterHead(drillNode).map((atom) => Number.parseFloat(atom)).filter((size) => size > 0) : []
+      if (padType === 'np_thru_hole') {
+        drill.push({ id: `d:${nextId(ids)}`, pos: globalPos, dia: Math.max(...(drillSizes.length > 0 ? drillSizes : [sx, sy])), plated: false })
+      } else if (padType !== 'smd' && drillSizes.length > 0) {
+        drill.push({ id: `d:${nextId(ids)}`, pos: globalPos, dia: Math.max(...drillSizes), plated: true })
+      }
+    }
+    const rratioNode = firstListNamed(node, 'roundrect_rratio')
+    const rratio = rratioNode ? Number.parseFloat(atomsAfterHead(rratioNode)[0] ?? '') : Number.NaN
+    const eid = nextId(ids)
+    const key = `p:${eid}`
+    const netId = targetLayers.length === 0 ? undefined : bindNet(netAtomOf(node), 'pad', key, fp.ref)
+    const pad: Pad = {
+      id: key,
+      pos: globalPos,
+      size: { x: sx, y: sy },
+      shape: padShapeOf(shapeToken),
+      // pad and text angles in the file are already board-absolute
+      rot: padRot,
+      footprintRef: fp.ref,
+      netId,
+      ...(atoms[0] !== undefined && atoms[0] !== '' ? { num: atoms[0] } : {}),
+      ...(Number.isFinite(rratio) ? { rratio } : {})
+    }
+    if (targetLayers.length === 0) {
+      fp.offCopper = [...(fp.offCopper ?? []), { pad, layers: throughHole ? ['F.Cu', 'B.Cu'] : ['F.Cu'] }]
+      recordDrill()
+      return
+    }
+    padRecords.push({ key, pad, netId })
+    fp.padRefs.push(key)
+    recordDrill()
+
     for (const layerId of targetLayers) {
       ensureLayer(layerId)
       copperFor(layerId).pads.push(pad)
@@ -513,9 +547,11 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
         value: info.value,
         refdes: fp.ref,
         pos: globalAt,
-        rot: info.rot,
+        rot: info.unlocked ? info.rot : keepUpright(info.rot),
         height: info.height,
         mirrored: info.mirrored,
+        justify: info.justify,
+        vjustify: info.vjustify,
         footprintRef: fp.ref
       })
       fp.silkRefs.push(textId)
@@ -545,6 +581,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       propertyValue(fpNode, 'Reference') ??
       fpTextField(fpNode, 'reference') ??
       (libId !== undefined ? libId.replace(/^[^:]*:/, '').replace(/[^A-Za-z0-9_.-]/g, '_') : `fp${footprints.length + 1}`)
+    const descrNode = firstListNamed(fpNode, 'descr')
     const fp: Footprint = {
       ref,
       value: propertyValue(fpNode, 'Value') ?? fpTextField(fpNode, 'value'),
@@ -554,7 +591,9 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       padRefs: [],
       silkRefs: [],
       model: modelName(fpNode),
-      models: modelRefs(fpNode, fileName)
+      models: modelRefs(fpNode, fileName),
+      footprint: libId?.replace(/^[^:]*:/, ''),
+      descr: [propertyValue(fpNode, 'Description'), descrNode !== undefined ? atomsAfterHead(descrNode)[0] : undefined].find((d) => d !== undefined && d.trim().length > 0)
     }
     footprintNodeById.set(ref, fpNode)
     for (const child of children(fpNode)) {
@@ -590,6 +629,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     const wNode = (strokeNode ? firstListNamed(strokeNode, 'width') : undefined) ?? firstListNamed(node, 'width')
     const width = wNode ? toNumber(atomsAfterHead(wNode)[0] ?? '0.12', fileName, 'fp_circle width') : 0.12
     const center = rotatePoint({ x: fpOrigin.x + cLocal.x, y: fpOrigin.y + cLocal.y }, fpOrigin, fpRot)
+    if (/\.(SilkS|Fab|CrtYd)$/.test(layerId) && radius > (fp.circle?.r ?? 0)) fp.circle = { center, r: radius }
     if (/\.SilkS$/.test(layerId)) {
       ensureLayer(layerId)
       const circleId = `sc:${nextId(ids)}`
@@ -652,7 +692,9 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
         pos: info.at,
         rot: info.rot,
         height: info.height,
-        mirrored: info.mirrored
+        mirrored: info.mirrored,
+        justify: info.justify,
+        vjustify: info.vjustify
       })
     }
     bbox.point(info.at)
@@ -799,8 +841,21 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
     drill,
     nets: netsOut,
     stats,
-    warnings
+    warnings,
+    titleBlock: parseTitleBlock(root),
+    layerNames
   }
+}
+
+function parseTitleBlock(root: SExprNode[]): BoardModel['titleBlock'] {
+  const tb = firstListNamed(root, 'title_block')
+  if (tb === undefined) return undefined
+  const read = (key: string): string | undefined => {
+    const node = firstListNamed(tb, key)
+    const v = node ? atomsAfterHead(node)[0] : undefined
+    return v === undefined || v.trim() === '' ? undefined : v
+  }
+  return { title: read('title'), rev: read('rev'), date: read('date'), company: read('company') }
 }
 
 function parseStackup(root: SExprNode[]): Stackup {
@@ -849,7 +904,7 @@ function resolvePadLayers(layerSpec: string[], declaredCopperLayerIds: string[],
       add(tok)
     }
   }
-  return out.length > 0 ? out : fallback
+  return out.length > 0 || layerSpec.length > 0 ? out : fallback
 }
 
 interface ArcGeo {
@@ -907,7 +962,7 @@ function approximateArc(a: Vec2, m: Vec2, b: Vec2): Vec2[] {
   const steps = Math.min(96, Math.max(2, Math.ceil((geo.r * sweep) / MAX_SEGMENT)))
   const out: Vec2[] = []
   for (let i = 0; i <= steps; i++) {
-    const t = geo.startAngle + (sweep * i) / steps
+    const t = geo.startAngle + (dir * sweep * i) / steps
     out.push({ x: geo.cx + geo.r * Math.cos(t), y: geo.cy + geo.r * Math.sin(t) })
   }
   return out

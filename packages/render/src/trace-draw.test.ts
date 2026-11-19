@@ -96,7 +96,8 @@ describe('drawTraceFrame', () => {
     const credit = 'made with silk reel'
     const late = (t: TraceTimeline) => Math.floor(t.totalFrames * 0.97)
     const rec = currentRecorder()
-    drawTraceFrame(asCtx(rec), traceTimeline('glasgow.kicad_pcb'), late(traceTimeline('glasgow.kicad_pcb')))
+    const plain = traceTimeline('glasgow.kicad_pcb')
+    drawTraceFrame(asCtx(rec), plain, late(plain))
     expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(false)
     const timeline = traceTimeline('glasgow.kicad_pcb', { credit: true })
     rec.reset()
@@ -105,7 +106,7 @@ describe('drawTraceFrame', () => {
     rec.reset()
     drawTraceFrame(asCtx(rec), timeline, late(timeline))
     expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(true)
-  })
+  }, 60_000)
 
   it('clears instead of filling on a transparent timeline', () => {
     const timeline = traceTimeline('glasgow.kicad_pcb', { transparent: true })

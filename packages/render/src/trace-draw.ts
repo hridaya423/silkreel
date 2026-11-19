@@ -429,6 +429,6 @@ export function drawTraceFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline,
   ctx.restore()
 
   // 10 title card — screen space, after the camera transform is popped
-  drawTitle(ctx, tl, p, 1)
+  drawTitle(ctx, tl, p)
   return drawn
 }

@@ -6,7 +6,7 @@
 //        --aspect 4:5 --at 0.02,0.3,0.62,0.8 [--animatic] [--smooth]
 //        [--palette mono] [--seed 42] [--out review/styleframes/<style>-<stamp>]
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { bundle } from '@remotion/bundler'
@@ -42,15 +42,13 @@ mkdirSync(out, { recursive: true })
 // same GL selection as renderFilm: angle uses the GPU, swangle for GPU-less CI
 const chromiumOptions = { gl: (process.env.SILK_REEL_GL ?? 'angle') as OpenGlRenderer }
 const entryPoint = path.join(root, 'packages/render/src/remotion-entry.tsx')
-const bundleLocation = await bundle({ entryPoint, onProgress: () => undefined })
+const bundleLocation = await bundle({ entryPoint, onProgress: () => undefined, enableCaching: false })
 
-// private reference: extracted per-run into review/ (gitignored), never committed elsewhere
+// private reference: copied per-run into review/ (gitignored), never committed elsewhere
 const referencePath = path.join(out, 'reference.mp4')
-try {
-  writeFileSync(referencePath, execFileSync('git', ['-C', root, 'show', 'HEAD:fixtures/reference/pcbanimation.mp4']))
-} catch {
-  console.warn('reference video not in git history; skipping reference stills')
-}
+const referenceSource = path.join(root, 'fixtures/reference/pcbanimation.mp4')
+if (existsSync(referenceSource)) copyFileSync(referenceSource, referencePath)
+else console.warn(`no reference video at ${referenceSource}; skipping reference stills`)
 const refDuration = existsSync(referencePath)
   ? Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', referencePath]).toString().trim())
   : 0

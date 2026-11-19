@@ -25,14 +25,14 @@ export interface BoardFit {
   map: (p: Vec2) => Vec2
 }
 
-/** fill the safe area; rotate 90° when that fills it markedly better */
-export function fitBoard(bbox: BBox, width: number, height: number, hasTitle: boolean): BoardFit {
+/** fill the safe area; rotate 90° when that fills it markedly better, unless `turn` is false */
+export function fitBoard(bbox: BBox, width: number, height: number, hasTitle: boolean, turn = true): BoardFit {
   const a = safeArea(width, height, hasTitle)
   const bw = Math.max(1e-6, bbox.max.x - bbox.min.x)
   const bh = Math.max(1e-6, bbox.max.y - bbox.min.y)
   const straight = Math.min(a.w / bw, a.h / bh)
   const turned = Math.min(a.w / bh, a.h / bw)
-  const rotated = turned > straight * 1.15
+  const rotated = turn && turned > straight * 1.15
   const scale = rotated ? turned : straight
   const bcx = (bbox.min.x + bbox.max.x) / 2
   const bcy = (bbox.min.y + bbox.max.y) / 2

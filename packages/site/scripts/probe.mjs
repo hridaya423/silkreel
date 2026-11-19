@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 const args = process.argv.slice(2)
 const url = args[0]
 const opt = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : args[i + 1] }
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] })
+const browser = await chromium.launch({ channel: 'chrome', chromiumSandbox: true, headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] })
 const page = await browser.newPage({ viewport: { width: +opt('--width', 1440), height: +opt('--height', 900) }, deviceScaleFactor: +opt('--dpr', 1) })
 const logs = []
 page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`))

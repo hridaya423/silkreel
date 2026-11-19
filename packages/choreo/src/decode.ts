@@ -54,6 +54,13 @@ export function decodeAlpha(
   return 0
 }
 
+/** a write-in that never falls back: each step of the decode holds the brightest level it has reached, so a mark that has landed whole stays whole */
+export function steadyAlpha(step: number, inStep: number, outStep: number, pattern: number, steps: number, smooth = false): number {
+  const local = Math.floor(mod(step - inStep, steps))
+  if (smooth || local >= IN_LEN || local >= mod(outStep - inStep, steps)) return decodeAlpha(step, inStep, outStep, pattern, steps, smooth)
+  return Math.max(...(DECODE_IN[pattern % DECODE_IN.length] ?? [0]).slice(0, local + 1))
+}
+
 /** the signal head: full ink while decoding in and for `flare` steps after, then `tone` */
 export function flareTone(step: number, inStep: number, flare: number | undefined, tone: number, steps: number): number {
   if (flare === undefined) return tone

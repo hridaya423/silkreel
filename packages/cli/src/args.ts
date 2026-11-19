@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { ASPECT_SIZE, MASK_COLORS, PALETTES } from '@silk-reel/choreo'
-import type { Aspect, FilmConfig, MaskColor, PaletteId, StyleId } from '@silk-reel/choreo'
+import type { Aspect, FilmConfig, GlyphEnding, MaskColor, PaletteId, StyleId } from '@silk-reel/choreo'
 import { FORMAT_EXT, OUTPUT_FORMATS, defaultFilmConfig, isAlphaFormat } from '@silk-reel/render-api'
 import type { OutputFormat } from '@silk-reel/render-api'
 
@@ -9,21 +9,27 @@ export const HELP = `usage: npm run reel -- <board.kicad_pcb> [options]
 
 Renders a film of a KiCad board (KiCad 4 or later).
 
-  --style trace|glyph|plot   trace: the lit board (default); glyph: parts set as type;
-                             plot: the board drawn in pen on paper
+  --style trace|glyph|plot|montage
+                             trace: the lit board (default); glyph: parts set as type;
+                             plot: the board drawn in pen on paper; montage: a fast-cut type film in three inks
   --aspect 4:5|1:1|9:16|16:9 frame (default 4:5)
-  --palette copper|mono|blueprint|phosphor|paper
+  --palette copper|mono|blueprint|phosphor|paper|cyanotype
   --accent #rrggbb           hero highlight colour
-  --hero REF                 the part the film is about, e.g. U3 (default: the biggest IC)
+  --hero REF                 the part the film is about, e.g. U3 (default: the chip that carries the most signals)
   --mask ${MASK_COLORS.join('|')}
                              solder mask colour (default: the board file's, else green)
   --title "Name"             title card; --version v1.0 adds a line under it
+  --line "text"              a line of your own for the montage's build (up to three; needs --title)
   --credit                   a small "made with silk reel" line on the last frame
+  --ending parts|routes      glyph's last shot: the name in the board's own parts (default),
+                             or the main chip routing the name
   --format mp4|gif|webm-alpha|prores-alpha
   --seed N                   each number gives a different variation (default 42)
   --tempo 0.75-1.5           pace (default 1)
   --draft                    fast preview quality
-  --no-audio                 leave the score out of a trace film
+  --no-audio                 leave the score out
+  --music FILE               your own track instead of the library's, cut to the film (its tempo locked,
+                             its biggest lift on the film's turn)
   --models DIR               another folder of STEP models (repeatable); trace films show each
                              part's own 3D model from the board's paths, the KiCad library and these
   --no-models                estimated part bodies only
@@ -40,12 +46,15 @@ const OPTIONS = {
   mask: { type: 'string' },
   title: { type: 'string' },
   version: { type: 'string' },
+  line: { type: 'string', multiple: true },
   credit: { type: 'boolean' },
+  ending: { type: 'string' },
   seed: { type: 'string' },
   tempo: { type: 'string' },
   format: { type: 'string' },
   draft: { type: 'boolean' },
   'no-audio': { type: 'boolean' },
+  music: { type: 'string' },
   models: { type: 'string', multiple: true },
   'no-models': { type: 'boolean' },
   help: { type: 'boolean', short: 'h' }
@@ -83,6 +92,8 @@ export interface CliArgs {
   /** one motion-blur sample and lighter maps: a fast look, not a release */
   draft: boolean
   audio: boolean
+  /** a track of the user's own for the score */
+  music: string | undefined
   /** folders searched for part models; undefined: no models */
   models: string[] | undefined
   help: boolean
@@ -110,18 +121,22 @@ export function parseCliArgs(argv: string[]): CliArgs {
   }
   const { values, positionals } = parsed
   const input = positionals[0]
-  if (values.help === true) return { input: input ?? '', out: '', config: defaultFilmConfig(), format: 'mp4', draft: false, audio: true, models: undefined, help: true }
+  if (values.help === true) return { input: input ?? '', out: '', config: defaultFilmConfig(), format: 'mp4', draft: false, audio: true, music: undefined, models: undefined, help: true }
   if (input === undefined || positionals.length > 1) throw new Error(HELP)
 
-  const style = oneOf<StyleId>('style', values.style, ['trace', 'glyph', 'plot']) ?? 'trace'
+  const style = oneOf<StyleId>('style', values.style, ['trace', 'glyph', 'plot', 'montage']) ?? 'trace'
   const aspect = oneOf<Aspect>('aspect', values.aspect, Object.keys(ASPECT_SIZE) as Aspect[]) ?? '4:5'
   const palette = oneOf<PaletteId>('palette', values.palette, Object.keys(PALETTES) as PaletteId[])
   const format = oneOf<OutputFormat>('format', values.format, OUTPUT_FORMATS) ?? 'mp4'
   const mask = oneOf<MaskColor>('mask', values.mask, MASK_COLORS)
+  const ending = oneOf<GlyphEnding>('ending', values.ending, ['parts', 'routes'])
   if (values.accent !== undefined && !/^#[0-9a-fA-F]{6}$/.test(values.accent)) {
     throw new Error(`--accent must be a #rrggbb hex color (got ${values.accent})`)
   }
   if (values.version !== undefined && values.title === undefined) throw new Error('--version needs --title')
+  if (values.line !== undefined && values.title === undefined) throw new Error('--line needs --title')
+  if ((values.line?.length ?? 0) > 3) throw new Error('--line takes at most three lines')
+  if (values.music !== undefined && values['no-audio'] === true) throw new Error('--music and --no-audio cannot go together')
 
   // same base as the studio/render-api: fixture boards pick up their curated cast hints
   const base = defaultFilmConfig(path.basename(input, '.kicad_pcb'))
@@ -139,13 +154,14 @@ export function parseCliArgs(argv: string[]): CliArgs {
     ...(values.hero !== undefined ? { hero: values.hero } : {}),
     ...(mask !== undefined ? { mask } : {}),
     ...(values.title !== undefined
-      ? { title: { name: values.title, ...(values.version !== undefined ? { version: values.version } : {}) } }
+      ? { title: { name: values.title, ...(values.version !== undefined ? { version: values.version } : {}), ...(values.line !== undefined ? { lines: values.line } : {}) } }
       : {}),
     ...(values.credit === true ? { credit: true } : {}),
+    ...(ending !== undefined ? { ending } : {}),
     ...(isAlphaFormat(format) ? { transparent: true } : {})
   }
   const out =
     values.out ??
     path.join(path.dirname(input), `${path.basename(input, '.kicad_pcb')}-${style}-${aspect.replace(':', 'x')}.${FORMAT_EXT[format]}`)
-  return { input, out, config, format, draft: values.draft === true, audio: values['no-audio'] !== true, models: values['no-models'] === true ? undefined : values.models ?? [], help: false }
+  return { input, out, config, format, draft: values.draft === true, audio: values['no-audio'] !== true, music: values.music, models: values['no-models'] === true ? undefined : values.models ?? [], help: false }
 }

@@ -29,6 +29,10 @@ export interface Pad {
   rot: number
   netId?: number | undefined
   footprintRef?: string | undefined
+  /** the pad's number in its footprint ("1", "A1", "EP") */
+  num?: string | undefined
+  /** a roundrect's corner radius over its shorter side, where the file gives one */
+  rratio?: number | undefined
 }
 
 export interface Trace {
@@ -62,6 +66,10 @@ export interface Text {
   rot: number
   height: number
   mirrored: boolean
+  /** which end of the text sits on pos: its start (left), its end (right), or neither (centred) */
+  justify?: 'left' | 'right' | undefined
+  /** which edge of a multi-line block sits on pos (centred when absent) */
+  vjustify?: 'top' | 'bottom' | undefined
   footprintRef?: string | undefined
 }
 
@@ -77,6 +85,14 @@ export interface Footprint {
   model?: string | undefined
   /** the visible 3D models, as written in the file: path, then offset (mm), scale and rotation (degrees) */
   models: ModelRef[]
+  /** the footprint's library name without its library, e.g. Valve_ECC-83-1 */
+  footprint?: string | undefined
+  /** the footprint's description, as written in the file */
+  descr?: string | undefined
+  /** the largest circle the footprint draws on its silk, fab or courtyard layer, board mm */
+  circle?: { center: Vec2; r: number } | undefined
+  /** pads whose (layers) name no copper layer (paste or mask only), left out of the copper, with the layers they once fell back to */
+  offCopper?: { pad: Pad; layers: string[] }[] | undefined
 }
 
 export interface ModelRef {
@@ -162,6 +178,10 @@ export interface BoardModel {
   nets: Net[]
   stats: BoardStats
   warnings: IngestWarning[]
+  /** the file's own (title_block): what its designer called it, its revision and date */
+  titleBlock?: { title?: string | undefined; rev?: string | undefined; date?: string | undefined; company?: string | undefined } | undefined
+  /** copper layer id → the free name the designer gave it in (layers), when it differs */
+  layerNames?: Record<string, string> | undefined
 }
 
 export interface Path {

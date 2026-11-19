@@ -165,7 +165,7 @@ describe('the field: the last scene, built in stages', () => {
       const chips = new Set(tl.placements.filter((p) => p.role === 'hero' && !p.glyphId.startsWith('cell:')).map((p) => p.glyphId))
       expect([...chips]).toEqual([`hero:${ref}`])
       const board = boardModel(file)
-      const pads = new Set([...Object.values(board.copper).flatMap((l) => l.pads), ...board.footprints.flatMap((f) => f.offCopper ?? []).map((o) => o.pad)].filter((p) => p.footprintRef === ref).map((p) => `${p.pos.x},${p.pos.y}`))
+      const pads = new Set([...Object.values(board.copper).flatMap((l) => l.pads), ...board.footprints.flatMap((f) => f.pasteOpenings ?? []).map((o) => o.pad)].filter((p) => p.footprintRef === ref).map((p) => `${p.pos.x},${p.pos.y}`))
       expect(tl.placements.filter((p) => p.stage !== undefined && p.role === 'hero').length).toBe(pads.size)
     })
 

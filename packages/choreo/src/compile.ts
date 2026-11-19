@@ -12,20 +12,20 @@ import { boardTitle } from './board-title'
 import { buildMontage } from './montage/score'
 import type { FilmConfig, PartBodies, Timeline } from './types'
 
-function withOffCopperPads(board: BoardModel): BoardModel {
-  const off = board.footprints.flatMap((f) => f.offCopper ?? [])
-  if (off.length === 0) return board
+function withPasteOpenings(board: BoardModel): BoardModel {
+  const openings = board.footprints.flatMap((f) => f.pasteOpenings ?? [])
+  if (openings.length === 0) return board
   const order = (id: string): number => Number(id.slice(2))
   const copper = { ...board.copper }
-  for (const { pad, layers } of off) {
+  for (const { pad, layers } of openings) {
     for (const layer of layers) {
       const c = copper[layer] ?? { traces: [], pads: [], vias: [], zones: [] }
       copper[layer] = { ...c, pads: [...c.pads, pad].sort((a, b) => order(a.id) - order(b.id)) }
     }
   }
-  const footprints = board.footprints.map((f) => f.offCopper === undefined
+  const footprints = board.footprints.map((f) => f.pasteOpenings === undefined
     ? f
-    : { ...f, padRefs: [...f.padRefs, ...f.offCopper.map((o) => o.pad.id)].sort((a, b) => order(a) - order(b)) })
+    : { ...f, padRefs: [...f.padRefs, ...f.pasteOpenings.map((o) => o.pad.id)].sort((a, b) => order(a) - order(b)) })
   return { ...board, copper, footprints }
 }
 
@@ -53,7 +53,7 @@ export function compileTimeline(board: BoardModel, config: FilmConfig, bodies?: 
     const t = resolved.style === 'montage' ? buildMontage(board, resolved, seed, bodies) : buildTraceScene(board, resolved.style === 'trace' && resolved.title === undefined ? { ...resolved, title: { name: boardTitle(board, resolved).name } } : resolved, seed, bodies)
     return { ...base, style: resolved.style, scene: t.scene, warnings: [...duration.warnings, ...resolved.knobWarnings, ...heroWarnings, ...t.warnings] }
   }
-  const glyphBoard = withOffCopperPads(board)
+  const glyphBoard = withPasteOpenings(board)
   const film = composeFilm(glyphBoard, resolved, seed, duration.durationSeconds)
   const facts = boardFacts(glyphBoard)
   const hero = heroPart(glyphBoard, resolved.hero ?? resolved.cast?.hero, resolved.cast)

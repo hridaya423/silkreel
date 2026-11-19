@@ -91,8 +91,8 @@ export interface Footprint {
   descr?: string | undefined
   /** the largest circle the footprint draws on its silk, fab or courtyard layer, board mm */
   circle?: { center: Vec2; r: number } | undefined
-  /** pads whose (layers) name no copper layer (paste or mask only), left out of the copper, with the layers they once fell back to */
-  offCopper?: { pad: Pad; layers: string[] }[] | undefined
+  /** pads whose (layers) name no copper layer (paste or mask only), kept out of the copper; glyph draws them as the paste openings, on the layers given */
+  pasteOpenings?: { pad: Pad; layers: string[] }[] | undefined
 }
 
 export interface ModelRef {

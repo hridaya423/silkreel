@@ -455,7 +455,7 @@ export function classifyKicad(root: SExprNode[], fileName: string): BoardModel {
       ...(Number.isFinite(rratio) ? { rratio } : {})
     }
     if (targetLayers.length === 0) {
-      fp.offCopper = [...(fp.offCopper ?? []), { pad, layers: throughHole ? ['F.Cu', 'B.Cu'] : ['F.Cu'] }]
+      fp.pasteOpenings = [...(fp.pasteOpenings ?? []), { pad, layers: throughHole ? ['F.Cu', 'B.Cu'] : ['F.Cu'] }]
       recordDrill()
       return
     }

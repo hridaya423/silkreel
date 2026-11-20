@@ -13,7 +13,7 @@ import type { OutputFormat } from './render-film.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..')
 const allowedVideoRoots = [path.join(repoRoot, 'exports'), path.join(repoRoot, 'fixtures')]
-const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'credit', 'transparent', 'hero', 'mask'] as const
+const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'credit', 'transparent', 'hero', 'mask', 'ending'] as const
 const CAST_KEYS = ['preferRefs', 'preferTexts'] as const
 const KNOB_KEYS = ['texts', 'tempo'] as const
 const STYLE_IDS: readonly StyleId[] = ['trace', 'glyph', 'plot', 'montage']
@@ -192,11 +192,13 @@ function parseFilmConfig(value: unknown): FilmConfigResult {
   }
   if (Object.hasOwn(value, 'title')) {
     const title = value.title
-    if (!isRecord(title) || typeof title.name !== 'string' || (title.version !== undefined && typeof title.version !== 'string')) {
-      return { ok: false, error: 'filmConfig.title must be an object { name: string, version?: string }' }
+    const lines = isRecord(title) ? title.lines : undefined
+    if (!isRecord(title) || typeof title.name !== 'string' || (title.version !== undefined && typeof title.version !== 'string') || (lines !== undefined && (!Array.isArray(lines) || lines.length > 3 || !lines.every((l) => typeof l === 'string')))) {
+      return { ok: false, error: 'filmConfig.title must be an object { name: string, version?: string, lines?: up to three strings }' }
     }
     const card: TitleCard = { name: title.name }
     if (title.version !== undefined) card.version = title.version
+    if (lines !== undefined) card.lines = lines
     config.title = card
   }
   if (Object.hasOwn(value, 'hero')) {
@@ -210,6 +212,10 @@ function parseFilmConfig(value: unknown): FilmConfigResult {
       return { ok: false, error: `filmConfig.mask must be one of ${MASK_COLORS.join(', ')}` }
     }
     config.mask = value.mask as MaskColor
+  }
+  if (Object.hasOwn(value, 'ending')) {
+    if (value.ending !== 'parts' && value.ending !== 'routes') return { ok: false, error: "filmConfig.ending must be 'parts' or 'routes'" }
+    config.ending = value.ending
   }
   if (Object.hasOwn(value, 'credit')) {
     if (typeof value.credit !== 'boolean') return { ok: false, error: 'filmConfig.credit must be a boolean' }

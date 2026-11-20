@@ -11,7 +11,7 @@ Renders a film of a KiCad board (KiCad 4 or later).
 
   --style trace|glyph|plot|montage
                              trace: the lit board (default); glyph: parts set as type;
-                             plot: the board drawn in pen on paper; montage: a fast-cut type film in three inks
+                             plot: a blueprint that ends on a title sheet; montage: a trailer cut of the lit board
   --aspect 4:5|1:1|9:16|16:9 frame (default 4:5)
   --palette copper|mono|blueprint|phosphor|paper|cyanotype
   --accent #rrggbb           hero highlight colour

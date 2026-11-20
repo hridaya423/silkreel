@@ -18,20 +18,18 @@ export interface BoardInfo {
   name: string
   maker: string
   footprints: number
-  /** the hero chip the glyph film lands on, from the compiled timeline */
-  hero: { ref: string; value: string }
   /** the name the site's films set, as scripts/render-strobe.sh passes it with --title and --version */
   title?: { name: string; version?: string }
 }
 
 /** counts read from each parsed fixture (fixtures/boards, parsed with @silk-reel/ingest) */
 export const boards: BoardInfo[] = [
-  { id: 'icebreaker', name: 'iCEBreaker', maker: '1BitSquared, CC BY-SA 4.0', footprints: 192, hero: { ref: 'U4', value: 'FT2232H' }, title: { name: 'iCEBreaker', version: 'v1.0e' } },
-  { id: 'glasgow', name: 'Glasgow', maker: 'Glasgow project, rev C3', footprints: 272, hero: { ref: 'U1', value: 'CY7C68013A' }, title: { name: 'Glasgow' } },
-  { id: 'StickHub', name: 'StickHub', maker: 'KiCad demo', footprints: 94, hero: { ref: 'U1', value: 'XR22417' } },
-  { id: 'ecc83-pp', name: 'ECC83 preamp', maker: 'KiCad demo', footprints: 15, hero: { ref: 'U1', value: 'ECC83' }, title: { name: 'ECC83 Preamp' } },
-  { id: 'kit-dev-coldfire-xilinx_5213', name: 'ColdFire dev kit', maker: 'KiCad demo', footprints: 160, hero: { ref: 'U301', value: 'XCR3256' }, title: { name: 'ColdFire Xilinx Dev Kit' } },
-  { id: 'video', name: 'Video board', maker: 'KiCad demo', footprints: 189, hero: { ref: 'U11', value: 'S5933' }, title: { name: 'Video Board' } }
+  { id: 'icebreaker', name: 'iCEBreaker', maker: '1BitSquared, CC BY-SA 4.0', footprints: 192, title: { name: 'iCEBreaker', version: 'v1.0e' } },
+  { id: 'glasgow', name: 'Glasgow', maker: 'Glasgow project, rev C3', footprints: 272, title: { name: 'Glasgow' } },
+  { id: 'StickHub', name: 'StickHub', maker: 'KiCad demo', footprints: 94 },
+  { id: 'ecc83-pp', name: 'ECC83 preamp', maker: 'KiCad demo', footprints: 15, title: { name: 'ECC83 Preamp' } },
+  { id: 'kit-dev-coldfire-xilinx_5213', name: 'ColdFire dev kit', maker: 'KiCad demo', footprints: 160, title: { name: 'ColdFire Xilinx Dev Kit' } },
+  { id: 'video', name: 'Video board', maker: 'KiCad demo', footprints: 189, title: { name: 'Video Board' } }
 ]
 
 export const aspects = [

@@ -135,7 +135,7 @@ export function setupStudio() {
       ...(state.style === 'glyph' ? { palette: state.palette } : {}),
       ...(state.useAccent ? { accent: state.accent } : {}),
       ...(state.hero ? { hero: state.hero } : {}),
-      ...(style === 'trace' && state.mask ? { mask: state.mask } : {}),
+      ...((style === 'trace' || style === 'montage') && state.mask ? { mask: state.mask } : {}),
       ...(style === 'glyph' && state.ending === 'routes' ? { ending: 'routes' } : {}),
       ...(named() || lines(style).length > 0 ? { title: { ...(named() ?? { name: boardName() }), ...(lines(style).length > 0 ? { lines: lines(style) } : {}) } } : {}),
       ...(state.credit ? { credit: true } : {})
@@ -151,7 +151,7 @@ export function setupStudio() {
     if (state.style === 'glyph') parts.push('--palette', state.palette)
     if (state.useAccent) parts.push('--accent', state.accent)
     if (state.hero) parts.push('--hero', quote(state.hero))
-    if (state.style === 'trace' && state.mask) parts.push('--mask', state.mask)
+    if ((state.style === 'trace' || state.style === 'montage') && state.mask) parts.push('--mask', state.mask)
     if (state.style === 'glyph' && state.ending === 'routes') parts.push('--ending', 'routes')
     const name = named()
     if (name || lines().length > 0) parts.push('--title', quote(name?.name ?? boardName()))
@@ -447,7 +447,7 @@ export function setupStudio() {
   }
 
   const paintControls = () => {
-    for (const el of root.querySelectorAll<HTMLElement>('[data-only]')) el.hidden = el.dataset.only !== state.style
+    for (const el of root.querySelectorAll<HTMLElement>('[data-only]')) el.hidden = !(el.dataset.only ?? '').split(' ').includes(state.style)
     for (const o of outs) o.textContent = `${state.tempo.toFixed(2)}×`
     if (accentSay) accentSay.textContent = state.useAccent ? state.accent : 'Default'
     if (accentReset) accentReset.hidden = !state.useAccent

@@ -188,6 +188,22 @@ describe('render-api contract', () => {
     })
   })
 
+  it('takes every option the studio sends: the glyph ending and the montage lines', async () => {
+    const queue = new StubQueue()
+    await withApp(queue, async (app) => {
+      const glyph = await app.inject({ method: 'POST', url: '/render', payload: { demoId: 'glasgow', filmConfig: { style: 'glyph', ending: 'routes' } } })
+      expect(glyph.statusCode).toBe(202)
+      expect(queue.submissions[0]?.config?.ending).toBe('routes')
+      const montage = await app.inject({ method: 'POST', url: '/render', payload: { demoId: 'glasgow', filmConfig: { style: 'montage', title: { name: 'Glasgow', lines: ['Ships in March', 'Open hardware'] } } } })
+      expect(montage.statusCode).toBe(202)
+      expect(queue.submissions[1]?.config?.title).toEqual({ name: 'Glasgow', lines: ['Ships in March', 'Open hardware'] })
+      const ending = await app.inject({ method: 'POST', url: '/render', payload: { demoId: 'glasgow', filmConfig: { ending: 'name' } } })
+      expect(ending.statusCode).toBe(400)
+      const four = await app.inject({ method: 'POST', url: '/render', payload: { demoId: 'glasgow', filmConfig: { title: { name: 'G', lines: ['a', 'b', 'c', 'd'] } } } })
+      expect(four.statusCode).toBe(400)
+    })
+  })
+
   it('accepts the four output formats and rejects anything else', async () => {
     const queue = new StubQueue()
     await withApp(queue, async (app) => {

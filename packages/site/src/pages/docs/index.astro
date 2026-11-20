@@ -33,9 +33,9 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     rows: [
       { flag: '--style', text: '`trace` films the lit board. `plot` draws it as a blueprint and ends on a title sheet. `montage` cuts it as a trailer: the build, a stop, the release. `glyph` sets its parts as type and ends on its name.', values: ['`trace`', '`plot`', '`montage`', '`glyph`'], def: '`trace`' },
       { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`cyanotype` for plot, `mono` for glyph, `copper` for the rest' },
-      { flag: '--accent', text: 'One highlight colour: the growing copper tips on trace, the main chip on glyph.', values: ['`#rrggbb`'], def: 'The palette’s own' },
+      { flag: '--accent', text: 'One highlight colour: the main chip on glyph, the signal and the stamp on plot.', values: ['`#rrggbb`'], def: 'The palette’s own' },
       { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The chip that carries the most signals' },
-      { flag: '--mask', text: 'The solder mask colour on trace.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
+      { flag: '--mask', text: 'The solder mask colour on trace and montage.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
     ]
   },
   {
@@ -92,7 +92,8 @@ const routes = [
 ]
 const env = [
   { name: 'SILK_REEL_GL', text: 'The Chromium GL backend. `angle` uses the GPU. Use `swangle` on a server with no GPU.', def: '`angle`' },
-  { name: 'SILK_REEL_CONCURRENCY', text: 'How many frames render at once. Lower it if the browser runs out of GPU memory.', def: 'Half the cores' }
+  { name: 'SILK_REEL_CONCURRENCY', text: 'How many frames render at once. Lower it if the browser runs out of GPU memory.', def: 'Half the cores' },
+  { name: 'SILK_REEL_MODELS', text: 'More folders of STEP models for trace and montage renders, separated by `:` (`;` on Windows).', def: 'None' }
 ]
 ---
 <Base title="Docs" image="/og-docs.png" description="Install silk reel and render a film from a .kicad_pcb. Every flag, format and default, plus the render API for self-hosting.">
@@ -129,7 +130,7 @@ const env = [
             <div class="term__bar"><p class="silk">~/silkreel</p><button type="button" class="term__copy silk" data-copy={site.command}>Copy</button></div>
             <pre class="term__body"><code><span class="term__p">$</span>{site.command}</code></pre>
           </div>
-          <p class="body">Trace, plot and montage films run 12 seconds. A glyph film runs 16 seconds and ends on the board’s name. Every film carries its own score. Trace, plot and montage renders also write <code class="mono">board.poster.png</code>, its last frame, for a cover image. <code class="mono">--draft</code> renders a quick preview at lower quality.</p>
+          <p class="body">Trace, plot and montage films run 12 seconds. A glyph film runs 16 seconds and ends on the board’s name. Every film carries its own score. Trace, plot and montage renders also write the film’s last frame beside it as a <code class="mono">.poster.png</code>, for a cover image. <code class="mono">--draft</code> renders a quick preview at lower quality.</p>
         </section>
 
         <section id="flags" class="doc">

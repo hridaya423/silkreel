@@ -200,7 +200,7 @@ export class RenderQueue implements RenderQueuePort {
       if (this.isCancelled(rendering.id)) return
       const board = entry.source.kind === 'demo' ? await loadDemoBoard(entry.source.demoId) : boardFromJson(entry.source.boardJson)
       if (this.isCancelled(rendering.id)) return
-      const bodies = entry.config.style === 'trace'
+      const bodies = entry.config.style === 'trace' || entry.config.style === 'montage'
         ? (await loadPartBodies(board, { boardDir: entry.source.kind === 'demo' ? boardsRoot : undefined, dirs: process.env.SILK_REEL_MODELS?.split(path.delimiter) })).bodies
         : undefined
       if (this.isCancelled(rendering.id)) return

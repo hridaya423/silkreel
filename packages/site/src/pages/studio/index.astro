@@ -12,9 +12,10 @@ const frameIcon = (id: string, size = 22) => {
 }
 const studioAspects = ['16:9', '1:1', '4:5', '9:16'] as const
 const looks = [
-  { id: 'plot', name: 'Plot', text: 'Copper in pen' },
+  { id: 'plot', name: 'Plot', text: 'The board as a blueprint' },
   { id: 'glyph', name: 'Glyph', text: 'Parts set as type' },
-  { id: 'trace', name: 'Trace', text: 'The lit board' }
+  { id: 'trace', name: 'Trace', text: 'The lit board' },
+  { id: 'montage', name: 'Montage', text: 'The board as a trailer' }
 ] as const
 ---
 <Base title="Studio" description="Drop a KiCad board and watch its release film play in your browser. Change the look, then record it or copy the command." image="/og.png">
@@ -113,6 +114,10 @@ const looks = [
             <button type="button" class="st__dice" data-dice aria-label="New random seed"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /><circle cx="5.5" cy="5.5" r="1" /><circle cx="10.5" cy="10.5" r="1" /><circle cx="8" cy="8" r="1" /></svg></button>
           </div>
           <label class="st__field"><span>Hero part</span><select name="hero"><option value="">Automatic</option></select></label>
+          <label class="st__field" data-only="glyph"><span>Ending</span><select name="ending">
+            <option value="parts">The name in the board’s parts</option>
+            <option value="routes">The main chip routes the name</option>
+          </select></label>
           <label class="st__field" data-only="trace"><span>Solder mask</span><select name="mask">
             <option value="">From the board file</option>
             <option value="green">Green</option><option value="black">Black</option><option value="white">White</option>
@@ -144,7 +149,7 @@ const looks = [
         </div>
         <ol class="st__jobs" data-jobs aria-live="polite"></ol>
         <div class="st__setup" data-setup>
-          <p class="st__note">This tab plays a draft of the film and records WebM. MP4, GIF, ProRes and the full trace film with its sound render on your machine. Set it up once:</p>
+          <p class="st__note">This tab plays a draft of the film and records WebM. MP4, GIF, ProRes and every film at full quality with its sound render on your machine. Set it up once:</p>
           <div class="st__chips" role="radiogroup" aria-label="Setup">
             <label class="st__chip"><input type="radio" name="setup" value="cmd" checked /><span>Commands</span></label>
             <label class="st__chip"><input type="radio" name="setup" value="agent" /><span>Agent prompt</span></label>

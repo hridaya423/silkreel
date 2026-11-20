@@ -1,15 +1,17 @@
 import { LooksGL } from './looks-gl'
 
-const LOOKS = ['plot', 'glyph', 'trace'] as const
-const WIDE: Array<[number, number]> = [[0.62, 0.82], [0.16, 0.84], [0.14, 0.3]]
-const REST: Array<[number, number]> = [[0.38, 0.7], [0.27, 0.7], [0.27, 0.6]]
+type Seams = [number, number, number]
+const LOOKS = ['plot', 'glyph', 'trace', 'montage'] as const
+const WIDE: Seams[] = [[0.58, 0.72, 0.86], [0.14, 0.72, 0.86], [0.14, 0.28, 0.86], [0.14, 0.28, 0.42]]
+const REST: Seams[] = [[0.34, 0.56, 0.78], [0.22, 0.56, 0.78], [0.22, 0.44, 0.78], [0.22, 0.44, 0.66]]
 
-const seams = (p: number): [number, number] => {
-  const x = Math.min(1, Math.max(0, p)) * 2
-  const a = WIDE[x < 1 ? 0 : 1] as [number, number]
-  const b = WIDE[x < 1 ? 1 : 2] as [number, number]
-  const t = x < 1 ? x : x - 1
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+const seams = (p: number): Seams => {
+  const x = Math.min(1, Math.max(0, p)) * (LOOKS.length - 1)
+  const k = Math.min(LOOKS.length - 2, Math.floor(x))
+  const a = WIDE[k] as Seams
+  const b = WIDE[k + 1] as Seams
+  const t = x - k
+  return a.map((v, i) => v + ((b[i] as number) - v) * t) as Seams
 }
 
 export interface LooksStage {
@@ -18,7 +20,7 @@ export interface LooksStage {
   peek(look: string | null): void
 }
 
-/** the three looks as bands of one board: the band under the pointer widens, a click keeps it */
+/** the four looks as bands of one board: the band under the pointer widens, a click keeps it */
 export function setupLooksStage(root: HTMLElement, reduced: boolean, choose: (look: string) => void): LooksStage | undefined {
   const canvas = root.querySelector<HTMLCanvasElement>('[data-looks-gl]')
   const frame = root.querySelector<HTMLElement>('[data-looks-frame]')
@@ -26,10 +28,10 @@ export function setupLooksStage(root: HTMLElement, reduced: boolean, choose: (lo
   const gl = LooksGL.create(canvas)
   if (!gl) return
   let look = Math.max(0, LOOKS.indexOf((root.dataset.look ?? 'trace') as (typeof LOOKS)[number]))
-  const rest = (): [number, number] => [...(REST[look] as [number, number])]
+  const rest = (): Seams => [...(REST[look] as Seams)]
   let target = rest()
   const s = rest()
-  const v: [number, number] = [0, 0]
+  const v: Seams = [0, 0, 0]
   let hover = false
   let ready = false
   let awake = false
@@ -43,13 +45,13 @@ export function setupLooksStage(root: HTMLElement, reduced: boolean, choose: (lo
   const paint = () => {
     const c = canvas.getBoundingClientRect()
     const f = frame.getBoundingClientRect()
-    gl.draw({ x: (f.left - c.left) * dpr, y: (f.top - c.top) * dpr, w: f.width * dpr, h: f.height * dpr }, f.width < 520 ? 30 : 46, s[0], s[1], dpr)
+    gl.draw({ x: (f.left - c.left) * dpr, y: (f.top - c.top) * dpr, w: f.width * dpr, h: f.height * dpr }, f.width < 520 ? 32 : 48, s, dpr)
   }
   const tick = (now: number) => {
     const dt = Math.min(0.032, (now - prev) / 1000)
     prev = now
     let moving = false
-    for (const i of [0, 1] as const) {
+    for (const i of [0, 1, 2] as const) {
       if (reduced) { s[i] = target[i]; continue }
       v[i] = (v[i] + (target[i] - s[i]) * 95 * dt) * Math.exp(-15 * dt)
       s[i] += v[i] * dt
@@ -65,19 +67,19 @@ export function setupLooksStage(root: HTMLElement, reduced: boolean, choose: (lo
     prev = performance.now()
     requestAnimationFrame(tick)
   }
-  const aim = (next: [number, number]) => { target = next; wake() }
+  const aim = (next: Seams) => { target = next; wake() }
 
   const at = (e: PointerEvent) => { const r = frame.getBoundingClientRect(); return (e.clientX - r.left) / r.width }
   frame.addEventListener('pointermove', (e) => { if (e.pointerType === 'touch') return; hover = true; overture = false; aim(seams(at(e))) })
   frame.addEventListener('pointerleave', () => { hover = false; aim(rest()) })
-  frame.addEventListener('click', (e) => { const p = at(e); choose(LOOKS[p < s[0] ? 0 : p < s[1] ? 1 : 2]) })
+  frame.addEventListener('click', (e) => { const p = at(e); choose(LOOKS[s.filter((x) => p >= x).length] ?? 'trace') })
 
   let overture = !reduced
   const play = () => {
     if (!overture || !ready) return
     aim(seams(0))
-    window.setTimeout(() => { if (overture) aim(seams(1)) }, 620)
-    window.setTimeout(() => { if (overture) { overture = false; aim(rest()) } }, 1300)
+    window.setTimeout(() => { if (overture) aim(seams(1)) }, 820)
+    window.setTimeout(() => { if (overture) { overture = false; aim(rest()) } }, 1600)
   }
   let seen = false
   new IntersectionObserver(([e], io) => { if (e?.isIntersecting) { seen = true; io.disconnect(); play() } }, { threshold: 0.55 }).observe(frame)
@@ -90,7 +92,7 @@ export function setupLooksStage(root: HTMLElement, reduced: boolean, choose: (lo
     LOOKS.forEach((id, i) => {
       const img = new Image()
       img.onload = () => {
-        gl.upload(i as 0 | 1 | 2, img)
+        gl.upload(i, img)
         if (--left) return
         ready = true
         size()

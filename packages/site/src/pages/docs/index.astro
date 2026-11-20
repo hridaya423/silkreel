@@ -23,7 +23,7 @@ const frames = [
   { ar: '9:16', size: '1080 × 1920', r: 9 / 16 },
   { ar: '16:9', size: '1920 × 1080', r: 16 / 9 }
 ].map((f) => ({ ...f, r: f.r.toFixed(4) }))
-const palettes = (['copper', 'mono', 'blueprint', 'phosphor', 'paper'] as const).map((id) => ({ id, ...PALETTES[id] }))
+const palettes = (['copper', 'mono', 'cyanotype', 'blueprint', 'phosphor', 'paper'] as const).map((id) => ({ id, ...PALETTES[id] }))
 
 type Value = string | { frame: (typeof frames)[number] } | { swatch: (typeof palettes)[number] }
 interface Flag { flag: string; text: string; values?: Value[]; def: string }
@@ -31,8 +31,8 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
   {
     name: 'Look',
     rows: [
-      { flag: '--style', text: '`trace` films the lit board. `plot` draws the same film in pen on paper. `glyph` sets its footprints as type in a loop.', values: ['`trace`', '`plot`', '`glyph`'], def: '`trace`' },
-      { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`copper` for trace, `paper` for plot, `mono` for glyph' },
+      { flag: '--style', text: '`trace` films the lit board. `plot` draws it as a blueprint and ends on a title sheet. `montage` cuts it as a trailer: the build, a stop, the release. `glyph` sets its parts as type and ends on its name.', values: ['`trace`', '`plot`', '`montage`', '`glyph`'], def: '`trace`' },
+      { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`cyanotype` for plot, `mono` for glyph, `copper` for the rest' },
       { flag: '--accent', text: 'One highlight colour: the growing copper tips on trace, the main chip on glyph.', values: ['`#rrggbb`'], def: 'The palette’s own' },
       { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The chip that carries the most signals' },
       { flag: '--mask', text: 'The solder mask colour on trace.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
@@ -47,8 +47,10 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
   {
     name: 'Title card',
     rows: [
-      { flag: '--title', text: 'Adds a title card at the end of the film.', values: ['`"Name"`'], def: 'No card' },
-      { flag: '--version', text: 'Adds a version line under the title. Needs `--title`.', values: ['`"v1.0"`'], def: 'None' },
+      { flag: '--title', text: 'The board’s name, as every film sets it.', values: ['`"Name"`'], def: 'The name on the silkscreen, else the title block’s' },
+      { flag: '--version', text: 'The version under the name. Needs `--title`.', values: ['`"v1.0"`'], def: 'The silkscreen’s, else the title block’s' },
+      { flag: '--line', text: 'A line of your own in the montage’s build. Repeat it for up to three. Needs `--title`.', values: ['`"text"`'], def: 'None' },
+      { flag: '--ending', text: 'How a glyph film ends: its name built from the board’s own parts, or the main chip routing its name.', values: ['`parts`', '`routes`'], def: '`parts`' },
       { flag: '--credit', text: 'Adds a small “made with silk reel” line to the last frame.', def: 'Off' }
     ]
   },
@@ -57,7 +59,10 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     rows: [
       { flag: '-o', text: 'Where the film is saved.', values: ['A file path'], def: 'Next to the board, as `board-trace-4x5.mp4`' },
       { flag: '--format', text: 'The file type.', values: ['`mp4`', '`gif`', '`webm-alpha`', '`prores-alpha`'], def: '`mp4`' },
-      { flag: '--no-audio', text: 'Leaves out the score that a trace film carries.', def: 'Off' },
+      { flag: '--no-audio', text: 'Leaves out the score. Every style has its own, cut to the film’s events.', def: 'Off' },
+      { flag: '--music', text: 'Your own track instead of the score, cut to the film: its tempo locked, its biggest lift on the film’s turn.', values: ['An audio file'], def: 'The score' },
+      { flag: '--models', text: 'Another folder of STEP models. Repeat it for more. Trace and montage show each part’s own 3D model from the board’s paths, the KiCad library and these folders.', values: ['A folder'], def: 'The board’s paths and the KiCad library' },
+      { flag: '--no-models', text: 'Draws estimated part bodies instead of 3D models.', def: 'Off' },
       { flag: '--draft', text: 'Renders faster at lower quality, to check a look before the final render.', def: 'Off' },
       { flag: '--help', text: 'Lists every flag.', def: 'Off' }
     ]
@@ -124,7 +129,7 @@ const env = [
             <div class="term__bar"><p class="silk">~/silkreel</p><button type="button" class="term__copy silk" data-copy={site.command}>Copy</button></div>
             <pre class="term__body"><code><span class="term__p">$</span>{site.command}</code></pre>
           </div>
-          <p class="body">A glyph film is an 11.2-second loop and renders in about ten seconds. A trace film runs 12 seconds, takes about 30 seconds on an Apple M4 Pro, and comes out near 8 MB. A plot film follows the same 12-second score and camera, drawn in pen. Trace and plot renders also write <code class="mono">board.poster.png</code>, its last frame, for a cover image. <code class="mono">--draft</code> takes a fraction of the time.</p>
+          <p class="body">Trace, plot and montage films run 12 seconds. A glyph film runs 16 seconds and ends on the board’s name. Every film carries its own score. Trace, plot and montage renders also write <code class="mono">board.poster.png</code>, its last frame, for a cover image. <code class="mono">--draft</code> renders a quick preview at lower quality.</p>
         </section>
 
         <section id="flags" class="doc">
@@ -228,7 +233,7 @@ const env = [
   import { prefersReducedMotion } from '../../engine/env'
 
   const film = document.querySelector<HTMLCanvasElement>('[data-docs-film]')
-  if (film) playPlot(film, '/films/plot/glasgow-16x9.json', prefersReducedMotion())
+  if (film) playPlot(film, '/films/plot/glasgow-16x9-paper.json', prefersReducedMotion())
 
   const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc]')]
   const io = new IntersectionObserver((entries) => {

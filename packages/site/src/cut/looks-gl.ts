@@ -45,6 +45,7 @@ precision highp float;
 uniform sampler2D uA;
 uniform sampler2D uB;
 uniform sampler2D uC;
+uniform sampler2D uE;
 uniform vec2 uRes;
 uniform float uD;
 uniform float uShadow;
@@ -58,11 +59,18 @@ flat in float vPair;
 flat in float vRed;
 out vec4 o;
 
+vec4 look(vec4 a, vec4 b, vec4 c, vec4 e, float i){
+  return i < 0.5 ? a : i < 1.5 ? b : i < 2.5 ? c : e;
+}
+
 void main(){
   if (any(lessThan(vUv, vec2(0.0))) || any(greaterThan(vUv, vec2(1.0)))) discard;
-  vec4 mid = texture(uB, vUv);
-  vec4 front = vPair < 0.5 ? texture(uA, vUv) : mid;
-  vec4 back = vPair < 0.5 ? mid : texture(uC, vUv);
+  vec4 a = texture(uA, vUv);
+  vec4 b = texture(uB, vUv);
+  vec4 c3 = texture(uC, vUv);
+  vec4 e = texture(uE, vUv);
+  vec4 front = look(a, b, c3, e, vPair);
+  vec4 back = look(a, b, c3, e, vPair + 1.0);
   vec3 N = normalize(vN);
   vec3 V = normalize(vec3(uRes * 0.5, uD) - vW);
   if (dot(N, V) < 0.0) discard;
@@ -104,14 +112,19 @@ precision highp float;
 uniform sampler2D uA;
 uniform sampler2D uB;
 uniform sampler2D uC;
+uniform sampler2D uE;
 uniform vec4 uFilm;
-uniform vec2 uSeam;
+uniform vec3 uSeam;
 uniform float uShear;
 in vec2 vUv;
 out vec4 o;
 void main(){
   float x = vUv.x - (vUv.y - 0.5) * uShear * uFilm.w / uFilm.z;
-  vec4 c = x < uSeam.x ? texture(uA, vUv) : x < uSeam.y ? texture(uB, vUv) : texture(uC, vUv);
+  vec4 a = texture(uA, vUv);
+  vec4 b = texture(uB, vUv);
+  vec4 c3 = texture(uC, vUv);
+  vec4 e = texture(uE, vUv);
+  vec4 c = x < uSeam.x ? a : x < uSeam.y ? b : x < uSeam.z ? c3 : e;
   o = vec4(c.rgb * 0.8 * c.a, c.a);
 }`
 
@@ -134,7 +147,7 @@ const smooth = (v: number) => { const x = Math.min(1, Math.max(0, v)); return x 
 
 export interface Film { x: number; y: number; w: number; h: number }
 
-/** one board behind a shutter of slats: three stills from one camera, a seam between each pair, every slat turning as a seam passes it */
+/** one board behind a shutter of slats: four stills from one camera, a seam between each pair, every slat turning as a seam passes it */
 export class LooksGL {
   private readonly gl: WebGL2RenderingContext
   private readonly slat: WebGLProgram
@@ -195,7 +208,7 @@ export class LooksGL {
     gl.enableVertexAttribArray(aQ)
     gl.vertexAttribPointer(aQ, 2, gl.FLOAT, false, 0, 0)
     gl.bindVertexArray(null)
-    this.tex = ['uA', 'uB', 'uC'].map((name, i) => {
+    this.tex = ['uA', 'uB', 'uC', 'uE'].map((name, i) => {
       const t = gl.createTexture()
       gl.activeTexture(gl.TEXTURE0 + i)
       gl.bindTexture(gl.TEXTURE_2D, t)
@@ -209,7 +222,7 @@ export class LooksGL {
     })
   }
 
-  upload(slot: 0 | 1 | 2, src: TexImageSource): void {
+  upload(slot: number, src: TexImageSource): void {
     const gl = this.gl
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.tex[slot] ?? null)
@@ -218,22 +231,23 @@ export class LooksGL {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
   }
 
-  draw(film: Film, n: number, s1: number, s2: number, dpr: number): void {
+  draw(film: Film, n: number, seams: readonly [number, number, number], dpr: number): void {
     const gl = this.gl
     const { width, height } = gl.canvas
     if (this.data.length !== n * 5) this.data = new Float32Array(n * 5)
     const sw = film.w / n
     const reach = 0.055
     const settle = 0.03
-    const split = (s1 + s2) / 2
     for (let i = 0; i < n; i++) {
       const x = (i + 0.5) / n
-      const left = x < split
-      const s = left ? x - s1 : s2 - x
+      const pair = x < (seams[0] + seams[1]) / 2 ? 0 : x < (seams[1] + seams[2]) / 2 ? 1 : 2
+      const seam = seams[pair]
+      const even = pair % 2 === 0
+      const s = even ? x - seam : seam - x
       const turn = HALF * smooth((s + reach) / reach) + HALF * smooth(s / settle)
-      const a = left ? turn : Math.PI - turn
+      const a = even ? turn : Math.PI - turn
       const d = (a - HALF) / 0.3
-      this.data.set([i, a, Math.abs(Math.sin(a)) * sw * 0.9, left ? 0 : 1, Math.exp(-d * d)], i * 5)
+      this.data.set([i, a, Math.abs(Math.sin(a)) * sw * 0.9, pair, Math.exp(-d * d)], i * 5)
     }
     gl.viewport(0, 0, width, height)
     gl.clearColor(0, 0, 0, 0)
@@ -247,7 +261,7 @@ export class LooksGL {
     const U = (name: string) => gl.getUniformLocation(this.under, name)
     gl.uniform4f(U('uFilm'), film.x, film.y, film.w, film.h)
     gl.uniform2f(U('uRes'), width, height)
-    gl.uniform2f(U('uSeam'), s1, s2)
+    gl.uniform3f(U('uSeam'), ...seams)
     gl.uniform1f(U('uShear'), SHEAR)
     gl.bindVertexArray(this.quad)
     gl.drawArrays(gl.TRIANGLES, 0, 6)

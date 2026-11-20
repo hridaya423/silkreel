@@ -4,6 +4,8 @@ import { createGlyphFilm } from './glyph-film'
 import type { GlyphFilmDraw } from './glyph-film'
 import type { Scene } from './film'
 import { loadFont } from './font'
+import { createMontage } from './montage-draw'
+import type { Montage } from './montage-draw'
 import { createPost } from './post'
 import type { Post } from './post'
 import { createTraceGL } from './trace-gl'
@@ -23,6 +25,7 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
   let trace: { gl: TraceGL; w: number; h: number } | null = null
   let glyph: { tl: Timeline; scene: Scene; off: HTMLCanvasElement } | null = null
   let film: { draw: GlyphFilmDraw; w: number; h: number } | null = null
+  let montage: { film: Montage; w: number; h: number } | null = null
 
   const traceFor = (w: number, h: number) => {
     if (trace?.w === w && trace.h === h) return trace.gl
@@ -46,6 +49,15 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
           return
         }
       }
+      if (tl.style === 'montage') {
+        if (montage?.w !== tl.width || montage.h !== tl.height) {
+          montage?.film.dispose()
+          montage = { film: createMontage(tl.width, tl.height, quality), w: tl.width, h: tl.height }
+        }
+        target.clearRect(0, 0, tl.width, tl.height)
+        target.drawImage(montage.film.render(tl, frame), 0, 0)
+        return
+      }
       if (glyph?.tl !== tl) {
         const off = glyph?.off ?? document.createElement('canvas')
         off.width = tl.width
@@ -67,8 +79,10 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
     },
     dispose() {
       trace?.gl.dispose()
+      montage?.film.dispose()
       post?.dispose()
       trace = null
+      montage = null
       post = undefined
     }
   }

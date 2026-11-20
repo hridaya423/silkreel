@@ -11,7 +11,8 @@ const n = (v: number) => v.toLocaleString('en-US')
 const styles = [
   { id: 'glyph', text: 'Parts set as type' },
   { id: 'trace', text: 'The lit board' },
-  { id: 'plot', text: 'The board drawn in pen' }
+  { id: 'plot', text: 'The board as a blueprint' },
+  { id: 'montage', text: 'The board as a trailer' }
 ] as const
 // the board picker draws each board's plan in a 2:1 box; its width dimension spans the drawn outline
 const plan = (id: string) => {
@@ -20,9 +21,10 @@ const plan = (id: string) => {
 }
 const acts = ['Copper', 'Mask', 'Silk', 'Place', 'Power', 'Hold']
 const looks = [
-  { id: 'plot', name: 'Plot', text: 'Copper in pen', alt: 'Glasgow drawn in pen: its outline, parts and the hero chip’s nets in red' },
-  { id: 'glyph', name: 'Glyph', text: 'Parts set as type', alt: 'Glasgow’s parts set as type marks on a black board' },
-  { id: 'trace', name: 'Trace', text: 'The lit board', alt: 'Glasgow rendered lit, with its parts in place and U1 glowing' }
+  { id: 'plot', name: 'Plot', text: 'A blueprint', alt: 'Glasgow drawn as a blueprint: its copper, pads and parts in pale ink on navy' },
+  { id: 'glyph', name: 'Glyph', text: 'Parts as type', alt: 'Glasgow’s parts set as glyphs on a black board, its iCE40 lit' },
+  { id: 'trace', name: 'Trace', text: 'The lit board', alt: 'Glasgow rendered lit, its parts in place and the board powered on' },
+  { id: 'montage', name: 'Montage', text: 'A trailer cut', alt: 'Glasgow in x-ray: its copper glowing through a dark board' }
 ] as const
 const rail = [{ id: '16:9', w: 140, h: 79 }, { id: '1:1', w: 88, h: 88 }, { id: '4:5', w: 88, h: 110 }, { id: '9:16', w: 80, h: 142 }]
 const glasgow = boards.find((b) => b.id === 'glasgow')
@@ -71,7 +73,7 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
 
   <section class="frames" id="frames" aria-labelledby="frames-title" data-frames>
     <div class="frames__pin pos"><div class="frames__scene">
-    <video class="frames__film" data-frames-film src="/films/macro/glasgow.mp4" poster="/films/macro/glasgow-poster.webp" muted playsinline preload="none" aria-label="Glasgow’s U1 up close, from bare copper to power-on"></video>
+    <video class="frames__film" data-frames-film src="/films/frames/glasgow.mp4" poster="/films/frames/glasgow-poster.webp" muted playsinline preload="none" aria-label="Glasgow’s trace film, from bare copper to power-on"></video>
     <div class="frames__copy">
       <h2 id="frames-title" class="frames__title" data-plot-hold><Lettering text="Every frame." weight={0.08} /></h2>
       <p class="frames__lede">From copper to power-on.</p>
@@ -93,7 +95,7 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
   </div>
 
   <section class="looks" id="looks" aria-labelledby="looks-title" data-looks data-look="trace">
-    <h2 id="looks-title" class="looks__title"><Lettering text={"Three looks.\nOne board."} weight={0.08} /></h2>
+    <h2 id="looks-title" class="looks__title"><Lettering text={"Four looks.\nOne board."} weight={0.08} /></h2>
     <div class="looks__stage">
       <div class="looks__frame" data-looks-frame></div>
       <canvas class="looks__gl" data-looks-gl aria-hidden="true"></canvas>
@@ -128,8 +130,7 @@ const frame = (id: keyof typeof ASPECT_SIZE) => {
         <div class="monitor__stage" data-monitor-stage>
           <div class="monitor__frame" data-monitor-frame>
             <canvas data-monitor-film role="img" aria-label="The film for the command" hidden></canvas>
-            <video data-monitor-video muted loop playsinline preload="none" poster="/films/cut/glasgow-16x9-poster.webp" aria-label="The trace film for the command"></video>
-            <canvas data-monitor-plot role="img" aria-label="The plot film for the command" hidden></canvas>
+            <video data-monitor-video muted loop playsinline preload="none" poster="/films/trace/glasgow-16x9-poster.webp" aria-label="The film for the command"></video>
           </div>
           <div class="monitor__bar">
             <button type="button" class="monitor__play" data-monitor-play aria-label="Pause"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="monitor__i-play" d="M5 3.5v13l11-6.5z" /><path class="monitor__i-pause" d="M5 3.5h3.4v13H5zM11.6 3.5H15v13h-3.4z" /></svg></button>

@@ -1,6 +1,6 @@
 import { gsap } from 'gsap'
 import { ASPECT_SIZE, DEMO_CAST_HINTS } from '@silk-reel/choreo'
-import type { Aspect, FilmConfig, MaskColor, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
+import type { Aspect, FilmConfig, GlyphEnding, MaskColor, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
 import { createPreview } from '@silk-reel/render/preview'
 import { prefersReducedMotion } from '../engine/env'
 import { aspects, boards, formats, site } from '../data/site'
@@ -12,7 +12,7 @@ interface State {
   board: string; style: StyleId; aspect: Aspect; palette: PaletteId; accent: string; useAccent: boolean
   title: string; version: string; credit: boolean; tempo: number; seed: number; format: Format
   /** '' lets the film pick */
-  hero: string; mask: MaskColor | ''
+  hero: string; mask: MaskColor | ''; ending: GlyphEnding
 }
 interface Own { id: string; file: string; name: string }
 interface Job { id: string; status: string; progress: number; format: string; error?: string; etaSeconds?: number | null }
@@ -69,7 +69,7 @@ export function setupStudio() {
   const sample = boards.find((b) => b.id === q.get('board'))
   const state: State = {
     board: sample?.id ?? 'glasgow',
-    style: q.get('style') === 'plot' ? 'plot' : q.get('style') === 'glyph' ? 'glyph' : 'trace',
+    style: (['plot', 'glyph', 'montage'] as const).find((v) => v === q.get('style')) ?? 'trace',
     aspect: (['4:5', '1:1', '9:16', '16:9'] as const).find((a) => a === q.get('aspect')) ?? '16:9',
     palette: (['mono', 'copper', 'blueprint', 'phosphor'] as const).find((p) => p === q.get('palette')) ?? 'mono',
     accent: /^#[0-9a-f]{6}$/i.test(q.get('accent') ?? '') ? q.get('accent') ?? ACCENT : ACCENT,
@@ -81,7 +81,8 @@ export function setupStudio() {
     seed: Number.isInteger(Number(q.get('seed'))) && q.get('seed') !== null ? Number(q.get('seed')) : 42,
     format: (['mp4', 'gif', 'webm-alpha', 'prores-alpha'] as const).find((f) => f === q.get('format')) ?? 'mp4',
     hero: (q.get('hero') ?? '').slice(0, 64),
-    mask: (['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple'] as const).find((c) => c === q.get('mask')) ?? ''
+    mask: (['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple'] as const).find((c) => c === q.get('mask')) ?? '',
+    ending: q.get('ending') === 'routes' ? 'routes' : 'parts'
   }
   /** the board the visitor dropped; it stays selectable after they try a sample */
   let own: Own | null = null
@@ -94,7 +95,7 @@ export function setupStudio() {
     const set = (name: string, v: string) => { const el = field(name)[0]; if (el) el.value = v }
     set('title', state.title); set('version', state.version); set('accent', state.accent)
     set('tempo', String(state.tempo)); set('seed', String(state.seed))
-    set('hero', state.hero); set('mask', state.mask)
+    set('hero', state.hero); set('mask', state.mask); set('ending', state.ending)
     const credit = field('credit')[0]; if (credit) credit.checked = state.credit
   }
   const readForm = () => {
@@ -110,6 +111,7 @@ export function setupStudio() {
     state.tempo = Number(val('tempo')) || 1
     state.hero = val('hero')
     state.mask = val('mask') as MaskColor | ''
+    state.ending = val('ending') === 'routes' ? 'routes' : 'parts'
     const seed = Number(val('seed'))
     state.seed = Number.isFinite(seed) ? Math.max(0, Math.min(99999, Math.round(seed))) : 42
   }
@@ -126,6 +128,7 @@ export function setupStudio() {
       ...(state.useAccent ? { accent: state.accent } : {}),
       ...(state.hero ? { hero: state.hero } : {}),
       ...(style === 'trace' && state.mask ? { mask: state.mask } : {}),
+      ...(style === 'glyph' && state.ending === 'routes' ? { ending: 'routes' } : {}),
       ...(state.title ? { title: { name: state.title, ...(state.version ? { version: state.version } : {}) } } : {}),
       ...(state.credit ? { credit: true } : {})
     }
@@ -141,6 +144,7 @@ export function setupStudio() {
     if (state.useAccent) parts.push('--accent', state.accent)
     if (state.hero) parts.push('--hero', quote(state.hero))
     if (state.style === 'trace' && state.mask) parts.push('--mask', state.mask)
+    if (state.style === 'glyph' && state.ending === 'routes') parts.push('--ending', 'routes')
     if (state.title) parts.push('--title', quote(state.title))
     if (state.title && state.version) parts.push('--version', quote(state.version))
     if (state.credit) parts.push('--credit')
@@ -438,7 +442,7 @@ export function setupStudio() {
     if (accentSay) accentSay.textContent = state.useAccent ? state.accent : 'Default'
     if (accentReset) accentReset.hidden = !state.useAccent
     if (liveNote) {
-      liveNote.hidden = state.style !== 'trace'
+      liveNote.hidden = state.style !== 'trace' && state.style !== 'montage'
       liveNote.textContent = 'Browser draft. Render locally for full quality and sound.'
     }
     if (paletteName) paletteName.textContent = cap(state.palette)
@@ -469,6 +473,7 @@ export function setupStudio() {
     if (state.format !== 'mp4') p.set('format', state.format)
     if (state.hero) p.set('hero', state.hero)
     if (state.mask) p.set('mask', state.mask)
+    if (state.style === 'glyph' && state.ending === 'routes') p.set('ending', 'routes')
     history.replaceState(history.state, '', u)
   }
 

@@ -61,6 +61,8 @@ for film in "${films[@]}"; do
     icebreaker) args=(fixtures/boards/icebreaker.kicad_pcb --title iCEBreaker --version v1.0e) ;;
     stickhub) args=(fixtures/boards/StickHub.kicad_pcb) ;;
     devkit) args=(fixtures/boards/kit-dev-coldfire-xilinx_5213.kicad_pcb --title "ColdFire Xilinx Dev Kit") ;;
+    ecc83-pp) args=(fixtures/boards/ecc83-pp.kicad_pcb --title "ECC83 Preamp") ;;
+    video) args=(fixtures/boards/video.kicad_pcb --title "Video Board") ;;
   esac
   key="$folder-$name"
   props="$out/props/$key.json"

@@ -112,7 +112,7 @@
 .strip__film::before { top: calc(8 * var(--k)); }
 .strip__film::after { bottom: calc(8 * var(--k)); }
 .strip__cells { position: absolute; left: calc(10 * var(--k)); right: calc(10 * var(--k)); top: calc(25 * var(--k)); height: calc(152 * var(--k));
-  background: linear-gradient(90deg, #151515 calc(2.75 * var(--k)), transparent 0 calc(100% - 2.75 * var(--k)), #151515 0) 0 0 / calc(100% / 6) 100%, url(/films/macro/glasgow-strip.webp) 0 0 / 100% 100%; }
+  background: linear-gradient(90deg, #151515 calc(2.75 * var(--k)), transparent 0 calc(100% - 2.75 * var(--k)), #151515 0) 0 0 / calc(100% / 6) 100%, url(/films/frames/glasgow-strip.webp) 0 0 / 100% 100%; }
 .strip__head { position: absolute; top: calc(-4 * var(--k)); bottom: calc(-4 * var(--k)); left: calc(10 * var(--k) + var(--p) * (100% - 20 * var(--k))); width: max(2px, calc(3 * var(--k))); translate: -50% 0;
   background: #e8271d; box-shadow: 0 0 calc(10 * var(--k)) rgb(232 39 29 / 0.55); pointer-events: none; }
 .strip__range { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; touch-action: pan-y; }
@@ -121,20 +121,21 @@
 .strip__acts li { text-align: center; font-size: calc(21 * var(--k)); letter-spacing: 0.02em; color: #b9b9b4; transition: color var(--t2) var(--soft); }
 .strip__acts li[data-on] { color: #f4f4f0; }
 
-/* ---------- three looks: one board in three materials, the chosen one comes forward ---------- */
+/* ---------- four looks: one board in four materials, the chosen one comes forward ---------- */
 .looks { height: calc(992 * var(--k)); background: var(--opal); }
 .looks__title { position: absolute; left: calc(56 * var(--k)); top: calc(58 * var(--k)); font-size: calc(56 * var(--k)); }
 .looks__arrival { position: absolute; inset: 0; z-index: 1; }
 .looks__arrival--trace { z-index: 2; }
-.looks[data-look='plot'] .looks__arrival--plot, .looks[data-look='glyph'] .looks__arrival--glyph { z-index: 3; }
+.looks[data-look='plot'] .looks__arrival--plot, .looks[data-look='glyph'] .looks__arrival--glyph, .looks[data-look='montage'] .looks__arrival--montage { z-index: 3; }
 .looks__stage { position: absolute; inset: 0; pointer-events: none; }
 .looks__card { --s: 1; --lift: 0px; position: absolute; height: auto; transform: translateY(var(--lift)) rotate(var(--r, 0deg)) scale(var(--s)); transform-origin: 50% 80%;
   filter: drop-shadow(0 calc(26 * var(--k)) calc(26 * var(--k)) rgb(0 0 0 / 0.2)) drop-shadow(0 calc(4 * var(--k)) calc(5 * var(--k)) rgb(0 0 0 / 0.18));
   transition: transform var(--t4) var(--seat), filter var(--t4) var(--seat); }
 .looks__card--trace { z-index: 2; left: calc(364 * var(--k)); top: calc(240 * var(--k)); width: calc(870 * var(--k)); }
 .looks__card--plot { z-index: 1; --r: -2.4deg; left: calc(30 * var(--k)); top: calc(332 * var(--k)); width: calc(717 * var(--k)); }
-.looks__card--glyph { z-index: 1; --r: 2.4deg; left: calc(840 * var(--k)); top: calc(300 * var(--k)); width: calc(717 * var(--k)); }
-.looks[data-look='plot'] .looks__card--plot, .looks[data-look='glyph'] .looks__card--glyph { z-index: 3; --s: 1.04; --lift: calc(-10 * var(--k)); }
+.looks__card--glyph { z-index: 1; --r: 1.2deg; left: calc(470 * var(--k)); top: calc(196 * var(--k)); width: calc(640 * var(--k)); }
+.looks__card--montage { z-index: 1; --r: 2.4deg; left: calc(840 * var(--k)); top: calc(300 * var(--k)); width: calc(717 * var(--k)); }
+.looks[data-look='plot'] .looks__card--plot, .looks[data-look='glyph'] .looks__card--glyph, .looks[data-look='montage'] .looks__card--montage { z-index: 3; --s: 1.04; --lift: calc(-10 * var(--k)); }
 .looks:not([data-look='trace']) .looks__card--trace { --s: 0.97; }
 .looks__picks { position: absolute; left: 0; right: 0; top: calc(842 * var(--k)); }
 .looks__gl { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; pointer-events: none; }
@@ -146,8 +147,9 @@
 .looks--live .looks__arrival { display: none; }
 .look { position: absolute; display: grid; justify-items: start; gap: calc(12 * var(--k)); padding: calc(6 * var(--k)) calc(8 * var(--k)); margin: calc(-6 * var(--k)) calc(-8 * var(--k)); text-align: left; color: var(--stock); border-radius: 4px; }
 .look--plot { left: calc(130 * var(--k)); }
-.look--trace { left: calc(660 * var(--k)); }
-.look--glyph { left: calc(1207 * var(--k)); }
+.look--glyph { left: calc(500 * var(--k)); }
+.look--trace { left: calc(870 * var(--k)); }
+.look--montage { left: calc(1240 * var(--k)); }
 .look__k { position: relative; font-size: calc(31 * var(--k)); font-weight: 700; letter-spacing: 0.01em; line-height: 1.15; }
 .look__k::after { content: ''; position: absolute; left: 0; right: 0; bottom: calc(-6 * var(--k)); height: max(2px, calc(3.5 * var(--k))); background: var(--c-red); scale: 0 1; transform-origin: left; transition: scale var(--t3) var(--seat); }
 .look[aria-pressed='true'] .look__k::after { scale: 1 1; }
@@ -183,8 +185,6 @@
 .monitor canvas { object-fit: contain; }
 .monitor [hidden] { display: none; }
 .monitor__bar { --ink: #f4f4f0; --ink-rgb: 244 244 240; position: absolute; left: calc(26 * var(--k)); right: calc(42 * var(--k)); bottom: calc(14 * var(--k)); display: flex; align-items: center; gap: calc(22 * var(--k)); color: var(--ink); }
-.monitor[data-style='plot'] .monitor__bar { --ink: var(--stock); --ink-rgb: var(--stock-rgb); }
-.monitor[data-style='plot'] .monitor__stage { box-shadow: inset 0 0 0 1px rgb(var(--stock-rgb) / 0.14); }
 .monitor__play { display: grid; place-items: center; width: calc(44 * var(--k)); height: calc(44 * var(--k)); min-width: 32px; min-height: 32px; border-radius: 4px; color: inherit; }
 .monitor__play svg { width: calc(22 * var(--k)); min-width: 16px; fill: currentColor; }
 .monitor__i-pause { display: none; }
@@ -225,8 +225,8 @@
   .looks__frame { left: 0; top: 0; width: 100%; }
   .looks__gl { inset: -32px 0; height: calc(100% + 64px); }
   .looks__card { top: 0; width: 100%; left: 0; opacity: 0; transition: opacity var(--t3) var(--soft); --r: 0deg; --s: 1; --lift: 0px; }
-  .looks[data-look='plot'] .looks__card--plot, .looks[data-look='glyph'] .looks__card--glyph, .looks[data-look='trace'] .looks__card--trace { opacity: 1; }
-  .looks__picks { position: static; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 20px; }
+  .looks[data-look='plot'] .looks__card--plot, .looks[data-look='glyph'] .looks__card--glyph, .looks[data-look='trace'] .looks__card--trace, .looks[data-look='montage'] .looks__card--montage { opacity: 1; }
+  .looks__picks { position: static; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 20px; }
   .look { position: static; margin: 0; padding: 8px 0; gap: 6px; }
   .look__k { font-size: 18px; }
   .look__t { font-size: 11px; }
@@ -358,13 +358,15 @@ html.dragging .drop { opacity: 1; }
   .looks__title { top: max(96px, calc(100 * var(--k))); }
   .looks__card--trace { top: calc(280 * var(--k)); }
   .looks__card--plot { top: calc(372 * var(--k)); }
-  .looks__card--glyph { top: calc(340 * var(--k)); }
+  .looks__card--glyph { top: calc(236 * var(--k)); }
+  .looks__card--montage { top: calc(340 * var(--k)); }
   .looks__picks { top: calc(882 * var(--k)); }
   .looks--live { height: calc(1050 * var(--k)); }
   .looks--live .looks__picks { top: calc(894 * var(--k)); }
   .looks--live .look--plot { left: calc(318 * var(--k)); }
-  .looks--live .look--glyph { left: calc(700 * var(--k)); }
-  .looks--live .look--trace { left: calc(1082 * var(--k)); }
+  .looks--live .look--glyph { left: calc(563 * var(--k)); }
+  .looks--live .look--trace { left: calc(808 * var(--k)); }
+  .looks--live .look--montage { left: calc(1053 * var(--k)); }
   .make__head { top: max(96px, calc(100 * var(--k))); }
 }
 @media (max-width: 900px) {

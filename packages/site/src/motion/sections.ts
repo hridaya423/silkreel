@@ -7,12 +7,12 @@ gsap.registerPlugin(ScrollTrigger)
 const FPS = 30
 const LAST = 359
 const ACTS = [
-  { name: 'Copper', a: 0, b: 95 },
-  { name: 'Mask', a: 95, b: 132 },
-  { name: 'Silk', a: 132, b: 152 },
-  { name: 'Place', a: 152, b: 228 },
-  { name: 'Power', a: 228, b: 330 },
-  { name: 'Hold', a: 330, b: LAST }
+  { name: 'Copper', a: 0, b: 75 },
+  { name: 'Mask', a: 75, b: 105 },
+  { name: 'Silk', a: 105, b: 112 },
+  { name: 'Place', a: 112, b: 180 },
+  { name: 'Power', a: 180, b: 299 },
+  { name: 'Hold', a: 299, b: LAST }
 ]
 const CELL = 100
 const CAPTIONS = ['Copper routes from your board file.', 'Solder mask reveals the copper.', 'Your silkscreen, in place.', 'Components settle onto their pads.', 'The board comes to life.', 'A final frame worth sharing.']
@@ -124,7 +124,8 @@ export function setupLanding(reduced: boolean) {
   if (looks) {
     gsap.matchMedia().add('(min-width: 901px)', () => {
       gsap.from('.looks__arrival--plot', { x: 110, y: 60, opacity: 0, ease: 'none', scrollTrigger: { trigger: looks, start: 'top 85%', end: 'top 15%', scrub: true } })
-      gsap.from('.looks__arrival--glyph', { x: -110, y: 60, opacity: 0, ease: 'none', scrollTrigger: { trigger: looks, start: 'top 85%', end: 'top 15%', scrub: true } })
+      gsap.from('.looks__arrival--glyph', { y: 90, opacity: 0, ease: 'none', scrollTrigger: { trigger: looks, start: 'top 85%', end: 'top 15%', scrub: true } })
+      gsap.from('.looks__arrival--montage', { x: -110, y: 60, opacity: 0, ease: 'none', scrollTrigger: { trigger: looks, start: 'top 85%', end: 'top 15%', scrub: true } })
       gsap.from('.looks__arrival--trace', { y: 60, ease: 'none', scrollTrigger: { trigger: looks, start: 'top 85%', end: 'top 15%', scrub: true } })
     })
   }

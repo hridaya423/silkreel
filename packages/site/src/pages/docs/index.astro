@@ -100,7 +100,7 @@ const env = [
     <header class="docs__head">
       <h1 class="xl"><Lettering text={"Render a film\nfrom the command line."} /></h1>
       <p class="lede">Install it, point it at a .kicad_pcb, and choose the look with flags. The same board and flags always render the same film.</p>
-      <div class="docs__film"><canvas class="docs__frame" data-docs-film aria-hidden="true"></canvas></div>
+      <div class="docs__film"><video class="docs__frame" data-docs-film src="/films/trace/glasgow-16x9.mp4" poster="/films/trace/glasgow-16x9-poster.webp" muted loop playsinline preload="metadata" aria-label="The trace film the command renders for Glasgow"></video></div>
     </header>
 
     <div class="docs__body">
@@ -229,11 +229,10 @@ const env = [
 </Base>
 
 <script>
-  import { playPlot } from '../../cut/plot-loop'
   import { prefersReducedMotion } from '../../engine/env'
 
-  const film = document.querySelector<HTMLCanvasElement>('[data-docs-film]')
-  if (film) playPlot(film, '/films/plot/glasgow-16x9-paper.json', prefersReducedMotion())
+  const film = document.querySelector<HTMLVideoElement>('[data-docs-film]')
+  if (film && !prefersReducedMotion()) new IntersectionObserver(([e]) => { if (e?.isIntersecting) void film.play().catch(() => { /* the poster stays */ }); else film.pause() }).observe(film)
 
   const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc]')]
   const io = new IntersectionObserver((entries) => {

@@ -1,5 +1,5 @@
 // Precompiles the plot film of each board the home page cuts against its trace film, in the same config the CLI renders that trace film with
-// (scripts/render-strobe.sh), part models included, so the two register frame for frame; the docs page plays Glasgow's on paper. Run from the repo root: npx tsx packages/site/scripts/plot-timelines.mts
+// (scripts/render-strobe.sh), part models included, so the two register frame for frame. Run from the repo root: npx tsx packages/site/scripts/plot-timelines.mts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 import { ASPECT_SIZE, compileTimeline, DEMO_CAST_HINTS } from '@silk-reel/choreo'
@@ -14,15 +14,14 @@ const round = (_k: string, v: unknown) => (typeof v === 'number' && !Number.isIn
 for (const id of ['icebreaker', 'glasgow', 'StickHub', 'ecc83-pp', 'kit-dev-coldfire-xilinx_5213', 'video']) {
   const board = parseKicadPcb(readFileSync(`fixtures/boards/${id}.kicad_pcb`, 'utf8'), `${id}.kicad_pcb`)
   const { bodies } = await loadPartBodies(board, { boardDir: 'fixtures/boards', dirs: [] })
-  const films: Array<[Aspect, 'paper' | undefined]> = id === 'glasgow' ? [['16:9', undefined], ['9:16', undefined], ['16:9', 'paper']] : [['16:9', undefined]]
-  for (const [aspect, palette] of films) {
+  for (const aspect of (id === 'glasgow' ? ['16:9', '9:16'] : ['16:9']) as Aspect[]) {
     const cast = DEMO_CAST_HINTS[id]
     const title = boards.find((b) => b.id === id)?.title
-    const config: FilmConfig = { style: 'plot', aspect, knobs: {}, seed: 42, duration: 'auto', output: { ...ASPECT_SIZE[aspect], fps: 30 }, ...(cast ? { cast } : {}), ...(palette ? { palette } : {}), ...(title ? { title } : {}) }
+    const config: FilmConfig = { style: 'plot', aspect, knobs: {}, seed: 42, duration: 'auto', output: { ...ASPECT_SIZE[aspect], fps: 30 }, ...(cast ? { cast } : {}), ...(title ? { title } : {}) }
     const tl = compileTimeline(board, config, bodies)
     if (tl.style !== 'plot') throw new Error('expected a plot timeline')
     const json = JSON.stringify({ ...tl, scene: { ...tl.scene, meshes: [] } }, round)
-    const file = `${out}/${id}-${aspect.replace(':', 'x')}${palette ? `-${palette}` : ''}.json`
+    const file = `${out}/${id}-${aspect.replace(':', 'x')}.json`
     writeFileSync(file, json)
     console.log(file, (json.length / 1024).toFixed(0), 'KB', (gzipSync(json).length / 1024).toFixed(0), 'KB gz')
   }

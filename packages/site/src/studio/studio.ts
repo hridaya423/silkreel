@@ -13,6 +13,8 @@ interface State {
   title: string; version: string; credit: boolean; tempo: number; seed: number; format: Format
   /** '' lets the film pick */
   hero: string; mask: MaskColor | ''; ending: GlyphEnding
+  /** the montage's own lines, up to three */
+  lines: string[]
 }
 interface Own { id: string; file: string; name: string }
 interface Job { id: string; status: string; progress: number; format: string; error?: string; etaSeconds?: number | null }
@@ -82,7 +84,8 @@ export function setupStudio() {
     format: (['mp4', 'gif', 'webm-alpha', 'prores-alpha'] as const).find((f) => f === q.get('format')) ?? 'mp4',
     hero: (q.get('hero') ?? '').slice(0, 64),
     mask: (['green', 'black', 'white', 'blue', 'red', 'yellow', 'purple'] as const).find((c) => c === q.get('mask')) ?? '',
-    ending: q.get('ending') === 'routes' ? 'routes' : 'parts'
+    ending: q.get('ending') === 'routes' ? 'routes' : 'parts',
+    lines: q.getAll('line').map((l) => l.trim().slice(0, 48)).filter(Boolean).slice(0, 3)
   }
   /** the board the visitor dropped; it stays selectable after they try a sample */
   let own: Own | null = null
@@ -96,6 +99,7 @@ export function setupStudio() {
     set('title', state.title); set('version', state.version); set('accent', state.accent)
     set('tempo', String(state.tempo)); set('seed', String(state.seed))
     set('hero', state.hero); set('mask', state.mask); set('ending', state.ending)
+    field('line').forEach((el, i) => { el.value = state.lines[i] ?? '' })
     const credit = field('credit')[0]; if (credit) credit.checked = state.credit
   }
   const readForm = () => {
@@ -112,10 +116,14 @@ export function setupStudio() {
     state.hero = val('hero')
     state.mask = val('mask') as MaskColor | ''
     state.ending = val('ending') === 'routes' ? 'routes' : 'parts'
+    state.lines = field('line').map((el) => el.value.trim()).filter(Boolean)
     const seed = Number(val('seed'))
     state.seed = Number.isFinite(seed) ? Math.max(0, Math.min(99999, Math.round(seed))) : 42
   }
 
+  const lines = (style: StyleId = state.style): string[] => (style === 'montage' ? state.lines : [])
+  /** the name the film sets: the visitor's, else the demo board's own title, as the site's films have it */
+  const named = (): { name: string; version?: string } | undefined => (state.title ? { name: state.title, ...(state.version ? { version: state.version } : {}) } : isOwn() ? undefined : boards.find((b) => b.id === state.board)?.title)
   const config = (scale: number, style: StyleId = state.style): FilmConfig => {
     const size = ASPECT_SIZE[state.aspect]
     const cast = DEMO_CAST_HINTS[state.board]
@@ -129,7 +137,7 @@ export function setupStudio() {
       ...(state.hero ? { hero: state.hero } : {}),
       ...(style === 'trace' && state.mask ? { mask: state.mask } : {}),
       ...(style === 'glyph' && state.ending === 'routes' ? { ending: 'routes' } : {}),
-      ...(state.title ? { title: { name: state.title, ...(state.version ? { version: state.version } : {}) } } : {}),
+      ...(named() || lines(style).length > 0 ? { title: { ...(named() ?? { name: boardName() }), ...(lines(style).length > 0 ? { lines: lines(style) } : {}) } } : {}),
       ...(state.credit ? { credit: true } : {})
     }
   }
@@ -145,8 +153,10 @@ export function setupStudio() {
     if (state.hero) parts.push('--hero', quote(state.hero))
     if (state.style === 'trace' && state.mask) parts.push('--mask', state.mask)
     if (state.style === 'glyph' && state.ending === 'routes') parts.push('--ending', 'routes')
-    if (state.title) parts.push('--title', quote(state.title))
-    if (state.title && state.version) parts.push('--version', quote(state.version))
+    const name = named()
+    if (name || lines().length > 0) parts.push('--title', quote(name?.name ?? boardName()))
+    if (name?.version) parts.push('--version', quote(name.version))
+    for (const l of lines()) parts.push('--line', quote(l))
     if (state.credit) parts.push('--credit')
     if (state.seed !== 42) parts.push('--seed', String(state.seed))
     if (state.tempo !== 1) parts.push('--tempo', String(state.tempo))
@@ -448,7 +458,7 @@ export function setupStudio() {
     if (paletteName) paletteName.textContent = cap(state.palette)
     if (lookUse) lookUse.textContent = root.querySelector(`[name="style"][value="${state.style}"] ~ .st__look-t`)?.textContent ?? ''
     if (aspectUse) aspectUse.textContent = aspects.find((a) => a.id === state.aspect)?.use ?? ''
-    if (titleIn) titleIn.placeholder = boardName()
+    if (titleIn) titleIn.placeholder = (isOwn() ? undefined : boards.find((b) => b.id === state.board)?.title?.name) ?? boardName()
     paintSample()
     // each flag wraps with its value, never between them; the board file wraps on its own
     cmdEl?.replaceChildren(...command().split(/ (?=--\w)|(?<=^npm run reel --) /).flatMap((part, i) => {
@@ -474,6 +484,7 @@ export function setupStudio() {
     if (state.hero) p.set('hero', state.hero)
     if (state.mask) p.set('mask', state.mask)
     if (state.style === 'glyph' && state.ending === 'routes') p.set('ending', 'routes')
+    for (const l of lines()) p.append('line', l)
     history.replaceState(history.state, '', u)
   }
 

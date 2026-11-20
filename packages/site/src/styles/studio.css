@@ -68,8 +68,7 @@
 .st__aspect:has(input:checked), .st__chip:has(input:checked) { box-shadow: inset 0 0 0 1.5px var(--c-red); }
 @media (hover: hover) { .st__aspect:not(:has(input:checked)):hover, .st__chip:not(:has(input:checked)):hover { box-shadow: inset 0 0 0 1px var(--c-ink); background: rgb(var(--ink-rgb) / 0.05); } }
 
-.st__looks { display: flex; flex-wrap: wrap; gap: 0 28px; }
-@media (max-width: 400px) { .st__looks { column-gap: 14px; } }
+.st__looks { display: flex; justify-content: space-between; column-gap: 12px; }
 .st__look { position: relative; display: grid; align-items: center; min-height: 44px; cursor: pointer; }
 .st__look-n { position: relative; font-size: 18px; font-weight: 700; letter-spacing: 0.01em; line-height: 1.15; }
 .st__look-n::after { content: ''; position: absolute; left: 0; right: 0; bottom: -5px; height: 2px; background: var(--c-red); scale: 0 1; transform-origin: left; transition: scale var(--t3) var(--seat); }
@@ -91,6 +90,8 @@
 .st__use { font-size: var(--t-s); color: var(--c-muted); }
 
 .st__pair { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 12px; }
+.st__lines { margin-top: 16px; }
+.st__lines[hidden] { display: none; }
 .st__field { display: grid; gap: 8px; font-size: 13px; color: var(--c-muted); }
 .st__field input[type='text'], .st__field input[type='number'] { width: 100%; height: 46px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; box-shadow: inset 0 0 0 1px var(--c-line-2); color: var(--c-ink); transition: box-shadow var(--t2) var(--soft); }
 .st__field select { width: 100%; height: 46px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; box-shadow: inset 0 0 0 1px var(--c-line-2); color: var(--c-ink); font: inherit; font-size: 1rem; }
@@ -160,7 +161,6 @@
   .st { --col: 300px; column-gap: 24px; }
   .st__bar { gap: 20px; }
   .st__transport { gap: 16px; }
-  .st__looks { column-gap: 22px; }
   .st__actions .btn { padding-inline: 8px; font-size: 13px; }
 }
 @media (max-width: 900px) {

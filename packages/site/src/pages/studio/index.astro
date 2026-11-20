@@ -97,10 +97,14 @@ const looks = [
       </fieldset>
 
       <fieldset class="st__g">
-        <legend><Lettering text="Title card" weight={0.1} /></legend>
+        <legend><Lettering text="Name" weight={0.1} /></legend>
         <div class="st__pair">
-          <label class="st__field"><span>Title</span><input type="text" name="title" maxlength="32" placeholder="Glasgow" autocomplete="off" spellcheck="false" data-title /></label>
-          <label class="st__field"><span>Version</span><input type="text" name="version" maxlength="12" placeholder="rev C3" autocomplete="off" spellcheck="false" /></label>
+          <label class="st__field"><span>Name</span><input type="text" name="title" maxlength="32" placeholder="Glasgow" autocomplete="off" spellcheck="false" data-title /></label>
+          <label class="st__field"><span>Version</span><input type="text" name="version" maxlength="12" placeholder="From board" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <div class="st__field st__lines" role="group" aria-label="Your lines" data-only="montage">
+          <span aria-hidden="true">Your lines, in the montage's build</span>
+          {[1, 2, 3].map((i) => <input type="text" name="line" maxlength="48" aria-label={`Line ${i}`} placeholder={i === 1 ? 'Up to three' : ''} autocomplete="off" spellcheck="false" />)}
         </div>
         <label class="st__check"><input type="checkbox" name="credit" /><span>Add silk reel credit</span></label>
       </fieldset>

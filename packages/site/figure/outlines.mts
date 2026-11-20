@@ -2,7 +2,7 @@
 // Writes src/blueprint/outlines.json: per board its size in mm and SVG paths (mm, origin at the outline's corner)
 // for the outline, the front parts, the hero part, and the holes.
 import { readFileSync, writeFileSync } from 'node:fs'
-import { DEMO_CAST_HINTS, heroPart } from '@silk-reel/choreo'
+import { heroPart } from '@silk-reel/choreo'
 import { parseKicadPcb } from '@silk-reel/ingest'
 import { extractParts } from '../../choreo/src/trace/parts'
 import { boards } from '../src/data/site'
@@ -27,7 +27,7 @@ const out = Object.fromEntries(boards.map((info) => {
   const h = Math.max(...all.map((p) => p.y)) - y0
   const path = (pts: { x: number; y: number }[], close: boolean) => pts.map((p, i) => `${i ? 'L' : 'M'}${r(p.x - x0)} ${r(p.y - y0)}`).join('') + (close ? 'Z' : '')
   const parts = extractParts(board)
-  const heroRef = heroPart(board, undefined, DEMO_CAST_HINTS[info.id])?.ref
+  const heroRef = heroPart(board)?.ref
   // a hero on the back copper means the board is shown from the back, as the films show it
   const back = parts.find((p) => p.ref === heroRef)?.back === true
   const box = (p: (typeof parts)[number]) => path(boxOf({ ...p, ...p.pos }), true)

@@ -106,13 +106,14 @@ If your machine has no GPU, put `SILK_REEL_GL=swangle` in front of the command. 
 | `--title`, `--version` | the board's name and revision on the title card | the silkscreen, else the title block |
 | `--hero` | the part the film is about, e.g. `U3` | the chip that carries the most signals |
 | `--mask` | `green` · `black` · `white` · `blue` · `red` · `yellow` · `purple` (trace and montage) | the board file's, else `green` |
+| `--accent` | one highlight colour: the light on trace, the chip's lit edge on montage, the main chip on glyph, the signal on plot | the palette's own |
 | `--palette` | `copper` · `mono` · `blueprint` · `phosphor` · `paper` · `cyanotype` | per style |
 | `--line` | up to three lines of your own in the montage's build | none |
 | `--ending` | glyph's last shot: `parts` or `routes` | `parts` |
 | `--music` | your own track, cut to the film | the style's score |
 | `--no-audio` | a silent film | off |
 | `--seed` | any number; each one gives a different variation | `42` |
-| `--credit` | a small "made with silk reel" line | off |
+| `--credit` | a 1.5 s "made with silk reel" card after the film | off |
 
 Run `npm run reel -- --help` for every flag. The alpha formats have a transparent background, so you can put the film over your own footage. The same board and flags always render the same film.
 
@@ -122,7 +123,7 @@ A trace film shows each part's own 3D model when it finds the STEP file. It read
 
 ## Share your film
 
-Post the MP4 as it is, or use `<name>.poster.png` as the cover. To credit the tool, add `--credit`. It puts a small "made with silk reel" line on the held last frame of a trace or plot film, and through the whole glyph film. The studio has the same switch. It is off by default.
+Post the MP4 as it is, or use `<name>.poster.png` as the cover. To credit the tool, add `--credit`. The film plays whole, then ends on a 1.5 s card: the silk reel mark, "made with silk reel" and the address. The poster PNG stays the film's own last frame. The studio has the same switch. It is off by default.
 
 ## Studio
 
@@ -161,7 +162,7 @@ Every change to how a film looks goes through a full-video review. [AGENTS.md](A
 - **STEP reading:** [occt-import-js](https://github.com/kovacsv/occt-import-js) and Open CASCADE Technology, both LGPL 2.1, used unmodified as an npm dependency.
 - **Type:** title cards use JetBrains Mono Medium and Bold, v2.304 from the [official release](https://github.com/JetBrains/JetBrainsMono/releases/tag/v2.304) (SIL Open Font License 1.1, [`OFL.txt`](packages/render/src/assets/OFL.txt)), bundled so renders match on every machine.
 - **Drafting type:** the blueprint film letters its callouts, panel titles and title block in Silk Draft, a modified version of Routed Gothic by Darren Embry (the regular weight from the [author's repository](https://github.com/dse/routed-gothic), SIL Open Font License 1.1, [`OFL-RoutedGothic.txt`](packages/render/src/assets/OFL-RoutedGothic.txt)). Silk Draft gives the 1 a flag and a foot and slashes the 0, so designators never read as I and O; [`scripts/silk-draft-font.py`](scripts/silk-draft-font.py) builds it from the original, and it is renamed because "Routed Gothic" is a Reserved Font Name.
-- **Banner type:** Martian Mono by Evil Martians, SIL Open Font License 1.1, the website's own typeface.
+- **Wordmark type:** Martian Mono by Evil Martians (SIL Open Font License 1.1, [`OFL-MartianMono.txt`](packages/render/src/assets/OFL-MartianMono.txt)), the website's own typeface, on the banner and the `--credit` end card.
 
 ## License
 

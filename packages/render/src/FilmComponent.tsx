@@ -8,6 +8,7 @@ import type { Post } from './post'
 import { createTraceGL } from './trace-gl'
 import type { TraceGL, TraceQuality } from './trace-gl'
 import { drawTitle } from './title'
+import { drawEndCard } from './end-card'
 import { useFont } from './font'
 import { createMontage } from './montage-draw'
 import type { Montage } from './montage-draw'
@@ -88,6 +89,10 @@ export const Film: React.FC<FilmProps> = ({ timeline, grain = true, quality, sam
     if (!canvas || !readyRef.current) return
     const target = canvas.getContext('2d')
     if (!target) return
+    if (frame >= timeline.totalFrames) {
+      drawEndCard(target, timeline, frame)
+      return
+    }
     if (timeline.style === 'glyph' && glyphRef.current !== null) {
       glyphRef.current(target, timeline, scene, frame)
       return

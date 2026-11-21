@@ -1,4 +1,4 @@
-import { NAME_SPACING, plotFrame, plotSnap, SHEET_SUB, sheetTitleSpan, stampBox } from '@silk-reel/choreo'
+import { NAME_SPACING, plotFrame, plotSnap, sheetTitleSpan, stampBox } from '@silk-reel/choreo'
 import type { PlotAxo, PlotScore, TraceTimeline } from '@silk-reel/choreo'
 import { BAND, CAP, ID, band, bleed, clamp01, lettered, setT, weights } from './plot-plan'
 import type { Pen } from './plot-plan'
@@ -66,10 +66,6 @@ export function drawSheet(pen: Pen, tl: TraceTimeline, plot: PlotScore, rel: num
     lettered(pen, mark, 0, 0, K, { align: 'center', base: 'middle', weight: '600', spacing: 0.15, color: tl.palette.head, alpha: 0.92 })
   }
 
-  if (tl.credit && rel >= n1) {
-    setT(pen, ID)
-    lettered(pen, 'made with silk reel', pen.W - 0.055 * Math.min(pen.W, pen.H), 0.055 * Math.min(pen.W, pen.H), SHEET_SUB * pen.su, { align: 'right', base: 'top', alpha: 0.6, spacing: 0.06 })
-  }
   setT(pen, ID)
   bleed(pen, false)
   return drawn

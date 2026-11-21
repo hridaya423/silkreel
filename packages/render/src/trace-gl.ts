@@ -269,7 +269,8 @@ const float SPILL_PX = 8.0;
 const float HEAT_FILL = 0.3;
 const float HEAT_EDGE_PX = 2.0;
 float inBox(vec2 p, vec4 b){ return step(b.x, p.x) * step(p.x, b.z) * step(b.y, p.y) * step(p.y, b.w); }
-uniform vec3 uWarm; uniform vec3 uCool;
+uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uAmber; uniform float uAccent;
+vec3 litTone(vec3 amber, float k){ return mix(amber, amber.r * pow(max(uAmber, vec3(1e-4)), vec3(k)), uAccent); }
 uniform float uMaskKeep; uniform float uFinishRough; uniform float uMaskFront; uniform float uMaskSoft; uniform float uMaskOn; uniform float uMaskLuma; uniform vec2 uMaskDir;
 uniform float uCured; uniform float uFinishOn; uniform float uSolder; uniform float uEnergy; uniform float uPxPerMm; uniform float uBump;
 uniform sampler2D tMirror; uniform float uMirrorOn; uniform vec2 uRes;
@@ -411,19 +412,19 @@ void main(){
   float pale = masked * smoothstep(0.5, 0.9, uMaskLuma);
   float dense = textureLod(tTop, vUv, 6.0).b + textureLod(tFx, vUv, 6.0).r + textureLod(tFx, vUv, 6.0).b;
   float tame = 1.0 / (1.0 + 5.0 * dense);
-  vec3 warmCol = mix(uWarm, vec3(1.0, 0.42, 0.1), pale * 0.75);
-  vec3 coolCol = mix(uCool, vec3(1.0, 0.6, 0.25), pale * 0.6);
+  vec3 warmCol = mix(uWarm, litTone(vec3(1.0, 0.42, 0.1), 1.0), pale * 0.75);
+  vec3 coolCol = mix(uCool, litTone(vec3(1.0, 0.6, 0.25), 0.6), pale * 0.6);
   vec3 glowC = (warmCol * pow(warm, 1.4) + coolCol * pow(cool, 1.4) * 1.15) * uEnergy * tame * mix(1.0, 0.85, pale) * (1.0 - drill) * seat;
   // fresh copper cools like a struck wire: white at the head, then amber, then a dull red into bare metal
-  vec3 hot = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.55, 0.18), smoothstep(0.04, 0.3, head));
+  vec3 hot = mix(litTone(vec3(0.85, 0.16, 0.03), 2.0), litTone(vec3(1.0, 0.55, 0.18), 0.7), smoothstep(0.04, 0.3, head));
   // held under the bloom threshold: the drawing glows, but power-on is the film's only light event
   float before = max(col.r, max(col.g, col.b));
   float inside = smoothstep(0.9, 0.99, textureLod(tTop, vUv, log2(max(1.0, HEAT_EDGE_PX * min(length(dFdx(vUv / uTexel)), length(dFdy(vUv / uTexel)))))).r);
   vec3 heat = hot * head * uEnergy * uHeat * (1.0 - masked) * (1.0 - drill);
   col += heat * min(1.0, max(0.0, LIT_MAX - before) / max(1e-4, max(heat.r, max(heat.g, heat.b)))) * mix(1.0, HEAT_FILL, inside);
-  vec3 kept = vec3(1.0, 0.48, 0.16) * uKeepCu * textureLod(tTop, vUv, 0.0).r * (1.0 - masked) * (1.0 - drill);
+  vec3 kept = litTone(vec3(1.0, 0.48, 0.16), 0.85) * uKeepCu * textureLod(tTop, vUv, 0.0).r * (1.0 - masked) * (1.0 - drill);
   col += kept * min(1.0, max(0.0, LIT_MAX - max(col.r, max(col.g, col.b))) / max(1e-4, kept.r));
-  col += vec3(1.0, 0.72, 0.42) * head * uFlare * tame * (1.0 - drill) * seat;
+  col += litTone(vec3(1.0, 0.72, 0.42), 0.38) * head * uFlare * tame * (1.0 - drill) * seat;
   // a pulse's white-hot core: the only thing in the film above the bloom threshold on a thin line
   col += vec3(1.0, 0.97, 0.92) * smoothstep(0.45, 1.0, head) * uFlare * 2.2 * (1.0 - drill) * seat;
   // lit copper is a line source: its light falls on the mask round it about as 1/d (three widths summed), tinted by the coat
@@ -435,7 +436,7 @@ void main(){
   vec3 tint = mix(vec3(1.0), uMask / max(1e-3, max(uMask.r, max(uMask.g, uMask.b))), 0.7);
   glowC += (uWarm * dot(spillW, wts) + uCool * dot(spillC, wts) + vec3(1.0, 0.9, 0.8) * dot(spillH, wts) * 0.8) * tint * uEnergy * 0.35 * uFlare / 1.6 * masked * (1.0 - drill) * seat;
   float glowPeak = max(glowC.r, max(glowC.g, glowC.b));
-  col += mix(glowC, vec3(1.0, 0.42, 0.1) * glowPeak, smoothstep(0.3, 1.5, glowPeak) * 0.6) * min(1.0, GLOW_MAX / max(1e-4, glowPeak));
+  col += mix(glowC, litTone(vec3(1.0, 0.42, 0.1), 1.0) * glowPeak, smoothstep(0.3, 1.5, glowPeak) * 0.6) * min(1.0, GLOW_MAX / max(1e-4, glowPeak));
   col += ledLight(gPos, vec3(0.0, 0.0, 1.0), mix(mix(mix(uSub, uMask, masked), uCopper, pad), uSilk, silk)) * (1.0 - drill);
   vec2 toLamp = (vec2(vW.x, -vW.y) - uLamp.xy) / uLamp.z;
   col += uLampCol * uLamp.w * exp(-dot(toLamp, toLamp)) * (0.3 + 0.7 * masked) * (1.0 - drill);
@@ -2160,6 +2161,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
   }
 
   let fillTint: RGB = [1, 1, 1]
+  let bandCol: RGB = [1, 0.42, 0.12]
   const xl = { look: PLAIN, scrC: [0, 0, 0] as V3, scrU: [1, 0, 0] as V3, scrV: [0, 1, 0] as V3, scrCol: [0, 0, 0] as V3, flip: 0, settle: [1, 0] as [number, number], nearDim: 0 }
   const lighting = (prog: Prog, cam: Cam, rig: Rig, fwd: number, band: readonly [number, number, number], poolAt: readonly [number, number, number]): void => {
     const { az, el, col } = rig.key
@@ -2176,7 +2178,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       .f('uBounce', prog === P.part || prog === P.mesh ? rig.partBounce ?? rig.bounce ?? 0 : rig.bounce ?? 0)
       .f('uSide', (prog === P.part || prog === P.mesh) && rig.partBounce !== undefined ? rig.turn ?? 1 : 0)
       .f('uRimOnly', rig.rimOnly).f('uMark', rig.mark ?? 0).f('uHeroLit', rig.heroLit ?? 1).f('uEtch', rig.etch ?? 0).f('uSweep', ...(rig.sweep ?? [0, 0, 0, 0, 1]).slice(0, 4)).f('uSweepLid', rig.sweep?.[4] ?? 1)
-      .f('uBand', ...band).f('uBandCol', 1.0, 0.42, 0.12)
+      .f('uBand', ...band).f('uBandCol', ...bandCol)
       .f('uPoolAt', poolAt[0], poolAt[1], poolAt[2], rig.fall ?? 0)
       .i('tShadow', 5).i('tSky', 6).m4('uLightVP', shadow.light).m4('uSkyVP', shadow.sky).f('uSkyOn', shadow.skyOn).f('uShadowBias', ...shadow.bias)
       .v3('uBoxC', shadow.boxC).v3('uBoxU', shadow.boxU).v3('uBoxV', shadow.boxV).v3('uBoxCol', shadow.boxCol)
@@ -2231,6 +2233,8 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const m = s.material
       const warmC = linear(m.energyWarm)
       const coolC = linear(m.energyCool)
+      const amber = m.accent === undefined ? [1, 0.42, 0.1] as RGB : linear(m.accent).map((v, _, c) => v / Math.max(1e-4, ...c)) as RGB
+      bandCol = m.accent === undefined ? [1, 0.42, 0.12] : amber
       const copper = linear(m.copper)
       const texel = [1 / MW, 1 / MH] as const
       const regionV = [region.x, region.y, region.w, region.h] as const
@@ -2502,7 +2506,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         P.top.use().m4('uVP', c.vp).i('tMirror', 7).f('uMirrorOn', mirrored ? 1 : 0).f('uRes', W, H).f('uRegion', ...regionV).f('uZ', 0)
           .f('uGold0', ...goldBox(0)).f('uGold1', ...goldBox(1)).f('uGold2', ...goldBox(2)).f('uGold3', ...goldBox(3)).i('tTop', 0).i('tSurf', 1).i('tFx', 2)
           .f('uTexel', ...texel).v3('uCopper', copper).v3('uFinish', linear(m.finish)).v3('uMask', maskLin)
-          .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC)
+          .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).v3('uAmber', amber).f('uAccent', m.accent === undefined ? 0 : 1)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskDir', maskDir[0], maskDir[1]).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2)).f('uMaskKeep', (rig.maskKeep ?? 0) * (1 - Math.pow(maskLuma, 1 / 2.2))).f('uKeepCu', rig.keepCu ?? 0).f('uFrontGain', rig.frontGain ?? 1)
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uSolder', span(acts.reflow)).f('uFinishOn', span([(acts.mask[0] + acts.mask[1]) / 2, acts.mask[1]]))
           .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] && !leds && s.power !== 'lamps' ? 1.6 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)

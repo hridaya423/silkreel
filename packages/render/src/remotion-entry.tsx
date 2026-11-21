@@ -2,6 +2,7 @@ import React from 'react'
 import { Composition, registerRoot, getInputProps } from 'remotion'
 import type { Timeline } from '@silk-reel/choreo'
 import { Film } from './FilmComponent'
+import { filmFrames } from './end-card'
 import type { RenderQuality } from './FilmComponent'
 
 export interface FilmInputProps {
@@ -48,7 +49,7 @@ const Root: React.FC = () => {
       calculateMetadata={({ props }) => {
         const { timeline } = readInputProps(props)
         return {
-          durationInFrames: timeline.totalFrames,
+          durationInFrames: filmFrames(timeline),
           fps: timeline.fps,
           width: timeline.width,
           height: timeline.height

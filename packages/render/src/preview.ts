@@ -11,6 +11,8 @@ import type { Post } from './post'
 import { createTraceGL } from './trace-gl'
 import type { TraceGL, TraceQuality } from './trace-gl'
 import { drawTitle } from './title'
+import { drawEndCard } from './end-card'
+export { filmFrames } from './end-card'
 
 export interface Preview {
   /** draws one frame of `tl` onto the canvas, resizing it to the timeline's size */
@@ -40,6 +42,10 @@ export function createPreview(canvas: HTMLCanvasElement, quality: TraceQuality =
       if (canvas.width !== tl.width || canvas.height !== tl.height) { canvas.width = tl.width; canvas.height = tl.height }
       const target = canvas.getContext('2d')
       if (!target) return
+      if (frame >= tl.totalFrames) {
+        drawEndCard(target, tl, frame)
+        return
+      }
       if (tl.style === 'trace') {
         const gl = traceFor(tl.width, tl.height)
         if (gl) {

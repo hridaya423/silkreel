@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { compileTimeline } from '@silk-reel/choreo'
 import type { FilmConfig, TraceTimeline } from '@silk-reel/choreo'
 import { drawTraceFrame } from './trace-draw.js'
+import { drawEndCard, filmFrames } from './end-card.js'
 import { asCtx, currentRecorder, RecordingCtx } from './test-recorder.js'
 import { boardModel } from '../../choreo/test/helpers.js'
 
@@ -92,20 +93,16 @@ describe('drawTraceFrame', () => {
     expect(texts.some((t) => 'Qzx Glasgow'.startsWith(t) && t.length > 0)).toBe(true)
   })
 
-  it('draws the credit only when asked, and only on the held frame', () => {
-    const credit = 'made with silk reel'
-    const late = (t: TraceTimeline) => Math.floor(t.totalFrames * 0.97)
+  it('leaves the film itself uncredited and ends a credited film on its card', () => {
     const rec = currentRecorder()
-    const plain = traceTimeline('glasgow.kicad_pcb')
-    drawTraceFrame(asCtx(rec), plain, late(plain))
-    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(false)
     const timeline = traceTimeline('glasgow.kicad_pcb', { credit: true })
+    drawTraceFrame(asCtx(rec), timeline, timeline.totalFrames - 1)
+    expect(callsOf('fillText').some((c) => String(c.args[0]).includes('silk reel')), 'the held poster carries no credit line').toBe(false)
+    expect(filmFrames(traceTimeline('glasgow.kicad_pcb')), 'no card without --credit').toBe(timeline.totalFrames)
+    expect(filmFrames(timeline), 'a 1.5 s card after the film').toBe(timeline.totalFrames + 45)
     rec.reset()
-    drawTraceFrame(asCtx(rec), timeline, Math.floor(timeline.totalFrames * 0.3))
-    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(false)
-    rec.reset()
-    drawTraceFrame(asCtx(rec), timeline, late(timeline))
-    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(true)
+    drawEndCard(asCtx(rec), timeline, filmFrames(timeline) - 1)
+    expect(callsOf('fillText').map((c) => c.args[0])).toEqual(['silk reel', 'made with', 'silkreel.hridya.tech'])
   }, 60_000)
 
   it('clears instead of filling on a transparent timeline', () => {

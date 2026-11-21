@@ -147,7 +147,7 @@ const AUDIO_CODEC: Record<Exclude<OutputFormat, 'gif'>, string[]> = {
   'prores-alpha': ['-c:a', 'pcm_s16le']
 }
 
-/** lay the film's score under the picture, replacing any silent track */
+/** lay the film's score under the picture, replacing any silent track; silence runs on under an end card */
 async function muxScore(outputLocation: string, format: Exclude<OutputFormat, 'gif'>, timeline: Timeline, music: string | undefined): Promise<void> {
   const wav = `${outputLocation}.score.wav`
   const ext = outputLocation.slice(outputLocation.lastIndexOf('.'))
@@ -158,7 +158,7 @@ async function muxScore(outputLocation: string, format: Exclude<OutputFormat, 'g
     await execFileAsync('ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y',
       '-i', outputLocation, '-i', wav,
-      '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', ...AUDIO_CODEC[format], '-shortest',
+      '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-af', 'apad', ...AUDIO_CODEC[format], '-shortest',
       ...(format === 'mp4' ? ['-movflags', '+faststart'] : []),
       muxed
     ])

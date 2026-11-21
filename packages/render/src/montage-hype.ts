@@ -105,12 +105,12 @@ export const shoulder = (rgba: Uint8ClampedArray): void => {
   }
 }
 
-/** in the stop the chip's lit rim leads: every pixel off the ring RIM_RING of the frame's width wide along the chip's drawn outline is held under STOP_LEVEL of the rim's peak and at no more colour (largest less smallest channel) than the rim's own, the median of its pixels at RIM_LIT of its peak or more (the lit line, not the leads beside it), so an LED stays a dim point and nothing out-shines or out-colours the rim */
+/** in the stop the chip's lit rim leads, in the --accent when there is one: every pixel off the ring RIM_RING of the frame's width wide along the chip's drawn outline is held under STOP_LEVEL of the rim's peak and at no more colour (largest less smallest channel) than the rim's own, the median of its pixels at RIM_LIT of its peak or more (the lit line, not the leads beside it), so an LED stays a dim point and nothing out-shines or out-colours the rim */
 export const RIM_RING = 0.02
 export const STOP_LEVEL = 0.75
 export const RIM_LIT = 0.8
 
-export const holdStop = (rgba: Uint8ClampedArray, ring: Uint8ClampedArray): void => {
+export const holdStop = (rgba: Uint8ClampedArray, ring: Uint8ClampedArray, accent?: string): void => {
   const luma = (i: number): number => 0.2126 * (rgba[i] as number) + 0.7152 * (rgba[i + 1] as number) + 0.0722 * (rgba[i + 2] as number)
   const on: number[] = []
   for (let j = 0; j < ring.length; j++) if ((ring[j] as number) >= 128) on.push(luma(4 * j))
@@ -124,9 +124,19 @@ export const holdStop = (rgba: Uint8ClampedArray, ring: Uint8ClampedArray): void
   }
   const colour = lit.length === 0 ? 0 : (lit.sort((a, b) => a - b)[Math.floor(0.5 * (lit.length - 1))] as number)
   const cap = STOP_LEVEL * peak
+  const tint = accent === undefined ? undefined : [1, 3, 5].map((k) => parseInt(accent.slice(k, k + 2), 16))
   for (let j = 0; j < ring.length; j++) {
     const i = 4 * j
-    if ((ring[j] as number) >= 128 && luma(i) >= RIM_LIT * peak) continue
+    if ((ring[j] as number) >= 128 && luma(i) >= RIM_LIT * peak) {
+      if (tint !== undefined) {
+        const l = luma(i)
+        const c = tint.map((v) => Math.min(255, (v * l) / Math.max(1, 0.2126 * (tint[0] as number) + 0.7152 * (tint[1] as number) + 0.0722 * (tint[2] as number))))
+        const lc = 0.2126 * (c[0] as number) + 0.7152 * (c[1] as number) + 0.0722 * (c[2] as number)
+        const u = lc >= l || lc >= 255 ? 0 : (l - lc) / (255 - lc)
+        for (let k = 0; k < 3; k++) rgba[i + k] = (c[k] as number) + (255 - (c[k] as number)) * u
+      }
+      continue
+    }
     let r = rgba[i] as number
     let g = rgba[i + 1] as number
     let b = rgba[i + 2] as number
@@ -690,7 +700,7 @@ export function createHype(width: number, height: number, quality: TraceQuality)
         rim.closePath()
         rim.stroke()
         const img = ctx.getImageData(0, 0, width, height)
-        holdStop(img.data, rim.getImageData(0, 0, width, height).data.filter((_, i) => i % 4 === 3))
+        holdStop(img.data, rim.getImageData(0, 0, width, height).data.filter((_, i) => i % 4 === 3), tl.scene.material.accent)
         ctx.putImageData(img, 0, 0)
       }
       if (pf.look === 'xray' && gl !== undefined && clone !== undefined) {

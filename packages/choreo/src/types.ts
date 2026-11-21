@@ -249,6 +249,8 @@ export interface TraceMaterial {
   /** energy hues: warm for power and pours, cool for clocks and data */
   energyWarm: string
   energyCool: string
+  /** the user's --accent: every light the film draws takes this hue in place of its amber */
+  accent?: string | undefined
   /** px per mm at zoom 1 */
   pxPerMm: number
   /** board thickness, px */

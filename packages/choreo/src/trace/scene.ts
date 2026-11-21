@@ -1137,6 +1137,7 @@ export function finePitch(board: BoardModel): boolean {
 function material(board: BoardModel, resolved: ResolvedConfig, pxPerMm: number): TraceMaterial {
   const palette = resolved.palette
   const trueColour = palette.copper === '#d08a4c'
+  const accent = palette.id === 'custom' ? palette.head : undefined
   // a board that declares no colour is most likely the fab's default green
   const mask = resolved.mask ?? board.stackup.maskColor?.toLowerCase() ?? DEMO_MASKS[board.source.boardName] ?? 'green'
   const declared = board.stackup.finish?.toLowerCase() ?? ''
@@ -1156,8 +1157,9 @@ function material(board: BoardModel, resolved: ResolvedConfig, pxPerMm: number):
     substrate: trueColour ? '#2b2617' : mixHex(palette.bg, palette.copperDim, 0.3),
     silk,
     // light reads against the mask: a deep amber on a white board, white-gold on a dark one
-    energyWarm: trueColour ? (luma(maskHex) > 0.5 ? '#ff6a14' : '#ffa860') : palette.head,
-    energyCool: trueColour ? (luma(maskHex) > 0.5 ? '#ff9a4a' : '#ffcf9c') : mixHex(palette.head, palette.silk, 0.5),
+    energyWarm: trueColour && accent === undefined ? (luma(maskHex) > 0.5 ? '#ff6a14' : '#ffa860') : palette.head,
+    energyCool: trueColour && accent === undefined ? (luma(maskHex) > 0.5 ? '#ff9a4a' : '#ffcf9c') : mixHex(palette.head, palette.silk, 0.5),
+    ...(accent === undefined ? {} : { accent }),
     pxPerMm,
     thicknessPx: board.stackup.thickness * pxPerMm,
     ground: groundFor(maskHex),

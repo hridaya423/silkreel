@@ -4,11 +4,15 @@ import url from './assets/JetBrainsMono-Medium.woff2'
 import boldUrl from './assets/JetBrainsMono-Bold.woff2'
 import draftUrl from './assets/SilkDraft.ttf'
 import groteskUrl from './assets/Archivo.ttf'
+import martianUrl from './assets/MartianMono.woff2'
 
 export const FONT = '"SilkMono", ui-monospace, Menlo, monospace'
 
 /** the blueprint's drafting face: Silk Draft, Routed Gothic with a flagged, footed 1 and a slashed 0 so designators read true */
 export const DRAFT = '"SilkDraft", "SilkMono", sans-serif'
+
+/** the site's own face, for the end card's wordmark */
+export const WORDMARK = '"SilkMartian", "SilkMono", monospace'
 
 let loaded: Promise<void> | undefined
 
@@ -18,7 +22,8 @@ export function loadFont(): Promise<void> {
     new FontFace('SilkMono', `url(${url})`).load(),
     new FontFace('SilkMono', `url(${boldUrl})`, { weight: '700' }).load(),
     new FontFace('SilkDraft', `url(${draftUrl})`).load(),
-    new FontFace('SilkGrotesk', `url(${groteskUrl})`, { weight: '100 900', stretch: '62% 125%' }).load()
+    new FontFace('SilkGrotesk', `url(${groteskUrl})`, { weight: '100 900', stretch: '62% 125%' }).load(),
+    new FontFace('SilkMartian', `url(${martianUrl})`, { weight: '100 800', stretch: '75% 112.5%' }).load()
   ]).then((faces) => {
     for (const f of faces) document.fonts.add(f)
   })

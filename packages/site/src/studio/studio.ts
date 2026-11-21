@@ -1,7 +1,7 @@
 import { gsap } from 'gsap'
 import { ASPECT_SIZE, DEMO_CAST_HINTS } from '@silk-reel/choreo'
 import type { Aspect, FilmConfig, GlyphEnding, MaskColor, PaletteId, StyleId, Timeline } from '@silk-reel/choreo'
-import { createPreview } from '@silk-reel/render/preview'
+import { createPreview, filmFrames } from '@silk-reel/render/preview'
 import { prefersReducedMotion } from '../engine/env'
 import { aspects, boards, formats, site } from '../data/site'
 import { rollTo } from '../motion/site'
@@ -287,14 +287,14 @@ export function setupStudio() {
 
   const takeTimeline = (next: Timeline) => {
     // held still (reduced motion), the monitor parks on the film's hold, where the board is lit, not on its first frame
-    const p = tl ? frame / tl.totalFrames : reduced ? 0.96 : 0
+    const p = tl ? frame / filmFrames(tl) : reduced ? (0.96 * next.totalFrames) / filmFrames(next) : 0
     tl = next
-    frame = Math.min(next.totalFrames - 1, p * next.totalFrames)
+    frame = Math.min(filmFrames(next) - 1, p * filmFrames(next))
     monitor.style.setProperty('--ar', `${String(next.width)} / ${String(next.height)}`)
     monitor.style.setProperty('--arn', String(next.width / next.height))
     stage.style.setProperty('--film-bg', next.palette.bg)
-    track?.setAttribute('aria-valuemax', String(next.totalFrames - 1))
-    if (durEl) durEl.textContent = tc(next.durationSeconds)
+    track?.setAttribute('aria-valuemax', String(filmFrames(next) - 1))
+    if (durEl) durEl.textContent = tc(filmFrames(next) / next.fps)
     if (recBtn) recBtn.disabled = false
     if (stillBtn) stillBtn.disabled = false
     dirty = true
@@ -303,7 +303,7 @@ export function setupStudio() {
   }
 
   const paintRead = (t: Timeline, f: number) => {
-    const p = f / t.totalFrames
+    const p = f / filmFrames(t)
     if (tcEl) tcEl.textContent = tc(f / t.fps)
     // the gate's sprockets advance one hole for every two frames, as the film is held on twos
     monitor.style.setProperty('--roll', `${String(-(Math.floor(f / 2) % 1000) * 24)}px`)
@@ -318,7 +318,7 @@ export function setupStudio() {
   new IntersectionObserver(([e]) => { onScreen = e?.isIntersecting ?? true }).observe(stage)
   gsap.ticker.add((_t, dms) => {
     if (!tl || !onScreen || document.hidden) return
-    if (playing) { frame = (frame + (Math.min(dms, 100) / 1000) * tl.fps) % tl.totalFrames; dirty = true }
+    if (playing) { frame = (frame + (Math.min(dms, 100) / 1000) * tl.fps) % filmFrames(tl); dirty = true }
     const f = Math.floor(frame)
     if (!dirty && f === drawn) return
     dirty = false
@@ -331,7 +331,7 @@ export function setupStudio() {
   const seekAt = (x: number) => {
     if (!tl || !track) return
     const r = track.getBoundingClientRect()
-    frame = Math.max(0, Math.min(tl.totalFrames - 1, ((x - r.left) / r.width) * tl.totalFrames))
+    frame = Math.max(0, Math.min(filmFrames(tl) - 1, ((x - r.left) / r.width) * filmFrames(tl)))
     dirty = true
   }
   let wasPlaying = false
@@ -344,12 +344,12 @@ export function setupStudio() {
   const letGo = () => { track?.classList.remove('is-held'); if (wasPlaying) setPlaying(true); wasPlaying = false }
   track?.addEventListener('pointerup', letGo)
   track?.addEventListener('pointercancel', letGo)
-  const step = (d: number) => { if (!tl) return; setPlaying(false); frame = (Math.floor(frame) + d + tl.totalFrames) % tl.totalFrames; dirty = true }
+  const step = (d: number) => { if (!tl) return; setPlaying(false); frame = (Math.floor(frame) + d + filmFrames(tl)) % filmFrames(tl); dirty = true }
   track?.addEventListener('keydown', (e) => {
     if (!tl) return
     if (e.key === 'Home') { e.preventDefault(); setPlaying(false); frame = 0; dirty = true }
-    else if (e.key === 'End') { e.preventDefault(); setPlaying(false); frame = tl.totalFrames - 1; dirty = true }
-    else if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); step((e.key === 'PageUp' ? 1 : -1) * Math.round(tl.totalFrames / 24)) }
+    else if (e.key === 'End') { e.preventDefault(); setPlaying(false); frame = filmFrames(tl) - 1; dirty = true }
+    else if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); step((e.key === 'PageUp' ? 1 : -1) * Math.round(filmFrames(tl) / 24)) }
   })
   addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement
@@ -560,7 +560,7 @@ export function setupStudio() {
     }
     let last = 0
     const watch = () => {
-      const p = frame / t.totalFrames
+      const p = frame / filmFrames(t)
       recBtn.style.setProperty('--p', p.toFixed(3))
       if (recLabel) recLabel.textContent = `Stop recording · ${String(Math.round(p * 100))}%`
       if (frame < last) rec.stop()

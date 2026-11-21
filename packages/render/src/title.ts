@@ -16,7 +16,6 @@ function titleWindow(tl: Timeline): readonly [number, number] | undefined {
 
 /** Release title card, bottom-left of the safe-area title band; it fades in whole on the hold beat. The trace film sets it large, under its poster. */
 export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number): void {
-  if (tl.credit) drawCredit(ctx, tl, p)
   const win = titleWindow(tl)
   if (win === undefined) return
   if (tl.style === 'trace') {
@@ -182,27 +181,5 @@ function drawLockup(ctx: CanvasRenderingContext2D, tl: TraceTimeline, p: number,
       })
     }
   }
-  ctx.restore()
-}
-
-/** "made with silk reel", bottom-right: in on the hold beat, or held for the whole glyph loop so the seam stays clean */
-function drawCredit(ctx: CanvasRenderingContext2D, tl: Timeline, p: number): void {
-  const win = titleWindow(tl)
-  const alpha = (win === undefined ? 1 : ease((p - win[0]) / 0.06)) * 0.6
-  if (alpha <= 0.002) return
-  const hasTitle = tl.title !== undefined
-  const a = safeArea(tl.width, tl.height, hasTitle)
-  const bandTop = a.y + a.h
-  const y = hasTitle ? bandTop + 0.045 * tl.height : bandTop + 0.55 * (tl.height - bandTop)
-  ctx.save()
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'alphabetic'
-  try {
-    ctx.letterSpacing = '0.08em'
-  } catch { /* older canvas impls */ }
-  ctx.font = `${0.02 * Math.min(tl.width, tl.height)}px ${FONT}`
-  ctx.fillStyle = tl.palette.silk
-  ctx.globalAlpha = alpha
-  ctx.fillText('made with silk reel', a.x + a.w, y)
   ctx.restore()
 }

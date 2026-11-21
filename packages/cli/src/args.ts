@@ -20,7 +20,7 @@ Renders a film of a KiCad board (KiCad 4 or later).
                              solder mask colour (default: the board file's, else green)
   --title "Name"             title card; --version v1.0 adds a line under it
   --line "text"              a line of your own for the montage's build (up to three; needs --title)
-  --credit                   a small "made with silk reel" line on the last frame
+  --credit                   end on a 1.5 s "made with silk reel" card
   --ending parts|routes      glyph's last shot: the name in the board's own parts (default),
                              or the main chip routing the name
   --format mp4|gif|webm-alpha|prores-alpha

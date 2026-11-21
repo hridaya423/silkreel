@@ -183,6 +183,21 @@ describe('a print of the main chip', { timeout: 120_000 }, () => {
     expect(at(17, 1), 'a dark grey stays').toEqual([30, 30, 30])
   })
 
+  it('lights the rim in the accent when one is given, at the rim\'s own brightness, and greys the rest as before', () => {
+    const w = 12
+    const rgba = new Uint8ClampedArray(w * 4)
+    const ring = new Uint8ClampedArray(w)
+    for (let x = 0; x < 6; x++) { rgba.set([200, 200, 196], 4 * x); ring[x] = 255 }
+    rgba.set([250, 40, 30], 4 * 8)
+    holdStop(rgba, ring, '#2f8cff')
+    const at = (x: number): number[] => [0, 1, 2].map((k) => rgba[4 * x + k] as number)
+    const luma = (c: number[]): number => 0.2126 * (c[0] as number) + 0.7152 * (c[1] as number) + 0.0722 * (c[2] as number)
+    const [r, g, b] = at(2) as [number, number, number]
+    expect(b > g && g > r, 'the rim takes the accent\'s hue').toBe(true)
+    expect(Math.abs(luma(at(2)) - luma([200, 200, 196])), 'at the rim\'s brightness').toBeLessThan(3)
+    expect(Math.max(...at(8)) - Math.min(...at(8)), 'the LED off the rim greys to the rim\'s measured colour').toBeLessThanOrEqual(5)
+  })
+
   it('rolls a draw shot\'s white-hot copper back to copper, keeps the light\'s fall across a pad, and leaves a pixel whose smallest channel is low', () => {
     const px = [[250, 250, 240], [200, 200, 192], [240, 150, 30], [60, 50, 30]]
     const rgba = new Uint8ClampedArray(px.flatMap((c) => [...c, 255]))

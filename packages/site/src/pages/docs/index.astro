@@ -33,7 +33,7 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     rows: [
       { flag: '--style', text: '`trace` films the lit board. `plot` draws it as a blueprint and ends on a title sheet. `montage` cuts it as a trailer: the build, a stop, the release. `glyph` sets its parts as type and ends on its name.', values: ['`trace`', '`plot`', '`montage`', '`glyph`'], def: '`trace`' },
       { flag: '--palette', text: 'The colours of the ground, ink and light.', values: palettes.map((swatch) => ({ swatch })), def: '`cyanotype` for plot, `mono` for glyph, `copper` for the rest' },
-      { flag: '--accent', text: 'One highlight colour: the main chip on glyph, the signal and the stamp on plot.', values: ['`#rrggbb`'], def: 'The palette’s own' },
+      { flag: '--accent', text: 'One highlight colour: the light on trace, the lit edge of the main chip before the montage’s hit, the main chip on glyph, the signal and the stamp on plot.', values: ['`#rrggbb`'], def: 'The palette’s own' },
       { flag: '--hero', text: 'The part the film is about. The copper grows out from it and the close-up frames it.', values: ['A reference, like `U3`'], def: 'The chip that carries the most signals' },
       { flag: '--mask', text: 'The solder mask colour on trace and montage.', values: ['`green`', '`black`', '`white`', '`blue`', '`red`', '`yellow`', '`purple`'], def: 'The board file’s, else `green`' }
     ]
@@ -51,7 +51,7 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
       { flag: '--version', text: 'The version under the name. Needs `--title`.', values: ['`"v1.0"`'], def: 'The silkscreen’s, else the title block’s' },
       { flag: '--line', text: 'A line of your own in the montage’s build. Repeat it for up to three. Needs `--title`.', values: ['`"text"`'], def: 'None' },
       { flag: '--ending', text: 'How a glyph film ends: its name built from the board’s own parts, or the main chip routing its name.', values: ['`parts`', '`routes`'], def: '`parts`' },
-      { flag: '--credit', text: 'Adds a small “made with silk reel” line to the last frame.', def: 'Off' }
+      { flag: '--credit', text: 'Ends the film on a 1.5 s “made with silk reel” card, after the held poster.', def: 'Off' }
     ]
   },
   {
